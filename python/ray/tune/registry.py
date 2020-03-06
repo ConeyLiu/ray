@@ -17,8 +17,7 @@ RLLIB_MODEL = "rllib_model"
 RLLIB_PREPROCESSOR = "rllib_preprocessor"
 RLLIB_ACTION_DIST = "rllib_action_dist"
 KNOWN_CATEGORIES = [
-    TRAINABLE_CLASS, ENV_CREATOR, RLLIB_MODEL, RLLIB_PREPROCESSOR,
-    RLLIB_ACTION_DIST
+    TRAINABLE_CLASS, ENV_CREATOR, RLLIB_MODEL, RLLIB_PREPROCESSOR, RLLIB_ACTION_DIST
 ]
 
 logger = logging.getLogger(__name__)
@@ -61,13 +60,11 @@ def register_trainable(name, trainable):
         logger.debug("Detected function for trainable.")
         trainable = wrap_function(trainable)
     elif callable(trainable):
-        logger.warning(
-            "Detected unknown callable for trainable. Converting to class.")
+        logger.warning("Detected unknown callable for trainable. Converting to class.")
         trainable = wrap_function(trainable)
 
     if not issubclass(trainable, Trainable):
-        raise TypeError("Second argument must be convertable to Trainable",
-                        trainable)
+        raise TypeError("Second argument must be convertable to Trainable", trainable)
     _global_registry.register(TRAINABLE_CLASS, name, trainable)
 
 
@@ -94,8 +91,7 @@ def _make_key(category, key):
     Returns:
         The key to use for storing a the value.
     """
-    return (b"TuneRegistry:" + category.encode("ascii") + b"/" +
-            key.encode("ascii"))
+    return b"TuneRegistry:" + category.encode("ascii") + b"/" + key.encode("ascii")
 
 
 class _Registry(object):
@@ -105,8 +101,7 @@ class _Registry(object):
     def register(self, category, key, value):
         if category not in KNOWN_CATEGORIES:
             from ray.tune import TuneError
-            raise TuneError("Unknown category {} not among {}".format(
-                category, KNOWN_CATEGORIES))
+            raise TuneError("Unknown category {} not among {}".format(category, KNOWN_CATEGORIES))
         self._to_flush[(category, key)] = pickle.dumps(value)
         if _internal_kv_initialized():
             self.flush_values()
@@ -123,8 +118,7 @@ class _Registry(object):
             value = _internal_kv_get(_make_key(category, key))
             if value is None:
                 raise ValueError(
-                    "Registry value for {}/{} doesn't exist.".format(
-                        category, key))
+                    "Registry value for {}/{} doesn't exist.".format(category, key))
             return pickle.loads(value)
         else:
             return pickle.loads(self._to_flush[(category, key)])

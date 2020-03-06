@@ -44,7 +44,8 @@ void UpdateObjectLocations(const GcsChangeMode change_mode,
 
 void ObjectDirectory::RegisterBackend() {
   auto object_notification_callback =
-      [this](gcs::RedisGcsClient *client, const ObjectID &object_id,
+      [this](gcs::RedisGcsClient *client,
+             const ObjectID &object_id,
              const GcsChangeMode change_mode,
              const std::vector<ObjectTableData> &location_updates) {
         // Objects are added to this map in SubscribeObjectLocations.
@@ -58,7 +59,9 @@ void ObjectDirectory::RegisterBackend() {
         it->second.subscribed = true;
 
         // Update entries for this object.
-        UpdateObjectLocations(change_mode, location_updates, gcs_client_->client_table(),
+        UpdateObjectLocations(change_mode,
+                              location_updates,
+                              gcs_client_->client_table(),
                               &it->second.current_object_locations);
         // Copy the callbacks so that the callbacks can unsubscribe without interrupting
         // looping over the callbacks.
@@ -74,41 +77,42 @@ void ObjectDirectory::RegisterBackend() {
         }
       };
   RAY_CHECK_OK(gcs_client_->object_table().Subscribe(
-      JobID::Nil(), gcs_client_->client_table().GetLocalClientId(),
-      object_notification_callback, nullptr));
+      JobID::Nil(),
+      gcs_client_->client_table().GetLocalClientId(),
+      object_notification_callback,
+      nullptr));
 }
 
 ray::Status ObjectDirectory::ReportObjectAdded(
-    const ObjectID &object_id, const ClientID &client_id,
+    const ObjectID &object_id,
+    const ClientID &client_id,
     const object_manager::protocol::ObjectInfoT &object_info) {
   RAY_LOG(DEBUG) << "Reporting object added to GCS " << object_id;
   // Append the addition entry to the object table.
   auto data = std::make_shared<ObjectTableData>();
   data->set_manager(client_id.Binary());
   data->set_object_size(object_info.data_size);
-  ray::Status status =
-      gcs_client_->object_table().Add(JobID::Nil(), object_id, data, nullptr);
+  ray::Status status = gcs_client_->object_table().Add(JobID::Nil(), object_id, data, nullptr);
   return status;
 }
 
 ray::Status ObjectDirectory::ReportObjectRemoved(
-    const ObjectID &object_id, const ClientID &client_id,
+    const ObjectID &object_id,
+    const ClientID &client_id,
     const object_manager::protocol::ObjectInfoT &object_info) {
   RAY_LOG(DEBUG) << "Reporting object removed to GCS " << object_id;
   // Append the eviction entry to the object table.
   auto data = std::make_shared<ObjectTableData>();
   data->set_manager(client_id.Binary());
   data->set_object_size(object_info.data_size);
-  ray::Status status =
-      gcs_client_->object_table().Remove(JobID::Nil(), object_id, data, nullptr);
+  ray::Status status = gcs_client_->object_table().Remove(JobID::Nil(), object_id, data, nullptr);
   return status;
 };
 
 void ObjectDirectory::LookupRemoteConnectionInfo(
     RemoteConnectionInfo &connection_info) const {
   GcsNodeInfo node_info;
-  bool found =
-      gcs_client_->client_table().GetClient(connection_info.client_id, &node_info);
+  bool found = gcs_client_->client_table().GetClient(connection_info.client_id, &node_info);
   ClientID result_client_id = ClientID::FromBinary(node_info.node_id());
   if (found) {
     RAY_CHECK(result_client_id == connection_info.client_id);
@@ -125,8 +129,7 @@ std::vector<RemoteConnectionInfo> ObjectDirectory::LookupAllRemoteConnections() 
   for (const auto &client_pair : clients) {
     RemoteConnectionInfo info(client_pair.first);
     LookupRemoteConnectionInfo(info);
-    if (info.Connected() &&
-        info.client_id != gcs_client_->client_table().GetLocalClientId()) {
+    if (info.Connected() && info.client_id != gcs_client_->client_table().GetLocalClientId()) {
       remote_connections.push_back(info);
     }
   }
@@ -173,8 +176,7 @@ ray::Status ObjectDirectory::SubscribeObjectLocations(const UniqueID &callback_i
   // immediately notify the caller of the current known locations.
   if (listener_state.subscribed) {
     auto &locations = listener_state.current_object_locations;
-    io_service_.post(
-        [callback, locations, object_id]() { callback(object_id, locations); });
+    io_service_.post([callback, locations, object_id]() { callback(object_id, locations); });
   }
   return status;
 }
@@ -206,20 +208,21 @@ ray::Status ObjectDirectory::LookupLocations(const ObjectID &object_id,
     // the object's creation, then call the callback immediately with the
     // cached locations.
     auto &locations = it->second.current_object_locations;
-    io_service_.post(
-        [callback, object_id, locations]() { callback(object_id, locations); });
+    io_service_.post([callback, object_id, locations]() { callback(object_id, locations); });
   } else {
     // We do not have any locations cached due to a concurrent
     // SubscribeObjectLocations call, so look up the object's locations
     // directly from the GCS.
     status = gcs_client_->object_table().Lookup(
-        JobID::Nil(), object_id,
-        [this, callback](gcs::RedisGcsClient *client, const ObjectID &object_id,
-                         const std::vector<ObjectTableData> &location_updates) {
+        JobID::Nil(), object_id,[this, callback](gcs::RedisGcsClient *client,
+                                const ObjectID &object_id,
+                                const std::vector<ObjectTableData> &location_updates) {
           // Build the set of current locations based on the entries in the log.
           std::unordered_set<ClientID> client_ids;
-          UpdateObjectLocations(GcsChangeMode::APPEND_OR_ADD, location_updates,
-                                gcs_client_->client_table(), &client_ids);
+          UpdateObjectLocations(GcsChangeMode::APPEND_OR_ADD,
+                                location_updates,
+                                gcs_client_->client_table(),
+                                &client_ids);
           // It is safe to call the callback directly since this is already running
           // in the GCS client's lookup callback stack.
           callback(object_id, client_ids);

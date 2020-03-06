@@ -25,8 +25,7 @@ using ray::Language;
 using ray::rpc::ProfileTableData;
 
 using MessageType = ray::protocol::MessageType;
-using ResourceMappingType =
-    std::unordered_map<std::string, std::vector<std::pair<int64_t, double>>>;
+using ResourceMappingType = std::unordered_map<std::string, std::vector<std::pair<int64_t, double>>>;
 using Socket = boost::asio::detail::socket_holder;
 using WaitResultPair = std::pair<std::vector<ObjectID>, std::vector<ObjectID>>;
 
@@ -47,7 +46,8 @@ class WorkerLeaseInterface {
   /// \param worker_id The unique worker id of the worker on the raylet node.
   /// \param disconnect_worker Whether the raylet should disconnect the worker.
   /// \return ray::Status
-  virtual ray::Status ReturnWorker(int worker_port, const WorkerID &worker_id,
+  virtual ray::Status ReturnWorker(int worker_port,
+                                   const WorkerID &worker_id,
                                    bool disconnect_worker) = 0;
 
   virtual ~WorkerLeaseInterface(){};
@@ -80,7 +80,8 @@ class RayletConnection {
   ray::Status WriteMessage(MessageType type,
                            flatbuffers::FlatBufferBuilder *fbb = nullptr);
 
-  ray::Status AtomicRequestReply(MessageType request_type, MessageType reply_type,
+  ray::Status AtomicRequestReply(MessageType request_type,
+                                 MessageType reply_type,
                                  std::unique_ptr<uint8_t[]> &reply_message,
                                  flatbuffers::FlatBufferBuilder *fbb = nullptr);
 
@@ -108,9 +109,13 @@ class RayletClient : public WorkerLeaseInterface {
   /// \param port The port that the worker will listen on for gRPC requests, if
   /// any.
   RayletClient(std::shared_ptr<ray::rpc::NodeManagerWorkerClient> grpc_client,
-               const std::string &raylet_socket, const WorkerID &worker_id,
-               bool is_worker, const JobID &job_id, const Language &language,
-               ClientID *raylet_id, int port = -1);
+               const std::string &raylet_socket,
+               const WorkerID &worker_id,
+               bool is_worker,
+               const JobID &job_id,
+               const Language &language,
+               ClientID *raylet_id,
+               int port = -1);
 
   /// Connect to the raylet via grpc only.
   ///
@@ -137,8 +142,10 @@ class RayletClient : public WorkerLeaseInterface {
   /// \param mark_worker_blocked Set to false if current task is a direct call task.
   /// \param current_task_id The task that needs the objects.
   /// \return int 0 means correct, other numbers mean error.
-  ray::Status FetchOrReconstruct(const std::vector<ObjectID> &object_ids, bool fetch_only,
-                                 bool mark_worker_blocked, const TaskID &current_task_id);
+  ray::Status FetchOrReconstruct(const std::vector<ObjectID> &object_ids,
+                                 bool fetch_only,
+                                 bool mark_worker_blocked,
+                                 const TaskID &current_task_id);
 
   /// Notify the raylet that this client (worker) is no longer blocked.
   ///
@@ -170,9 +177,12 @@ class RayletClient : public WorkerLeaseInterface {
   /// \param result A pair with the first element containing the object ids that were
   /// found, and the second element the objects that were not found.
   /// \return ray::Status.
-  ray::Status Wait(const std::vector<ObjectID> &object_ids, int num_returns,
-                   int64_t timeout_milliseconds, bool wait_local,
-                   bool mark_worker_blocked, const TaskID &current_task_id,
+  ray::Status Wait(const std::vector<ObjectID> &object_ids,
+                   int num_returns,
+                   int64_t timeout_milliseconds,
+                   bool wait_local,
+                   bool mark_worker_blocked,
+                   const TaskID &current_task_id,
                    WaitResultPair *result);
 
   /// Wait for the given objects, asynchronously. The core worker is notified when
@@ -191,8 +201,10 @@ class RayletClient : public WorkerLeaseInterface {
   /// \param The error message.
   /// \param The timestamp of the error.
   /// \return ray::Status.
-  ray::Status PushError(const ray::JobID &job_id, const std::string &type,
-                        const std::string &error_message, double timestamp);
+  ray::Status PushError(const ray::JobID &job_id,
+                        const std::string &type,
+                        const std::string &error_message,
+                        double timestamp);
 
   /// Store some profile events in the GCS.
   ///
@@ -207,7 +219,8 @@ class RayletClient : public WorkerLeaseInterface {
   /// or send it to all the object stores.
   /// \param delete_creating_tasks Whether also delete objects' creating tasks from GCS.
   /// \return ray::Status.
-  ray::Status FreeObjects(const std::vector<ray::ObjectID> &object_ids, bool local_only,
+  ray::Status FreeObjects(const std::vector<ray::ObjectID> &object_ids,
+                          bool local_only,
                           bool deleteCreatingTasks);
 
   /// Request raylet backend to prepare a checkpoint for an actor.
@@ -231,7 +244,8 @@ class RayletClient : public WorkerLeaseInterface {
   /// \param capacity Capacity of the resource
   /// \param client_Id ClientID where the resource is to be set
   /// \return ray::Status
-  ray::Status SetResource(const std::string &resource_name, const double capacity,
+  ray::Status SetResource(const std::string &resource_name,
+                          const double capacity,
                           const ray::ClientID &client_Id);
 
   /// Notifies the raylet of the object IDs currently in use on this worker.

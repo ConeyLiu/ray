@@ -16,10 +16,12 @@ namespace ray {
 
 class TaskFinisherInterface {
  public:
-  virtual void CompletePendingTask(const TaskID &task_id, const rpc::PushTaskReply &reply,
+  virtual void CompletePendingTask(const TaskID &task_id,
+                                   const rpc::PushTaskReply &reply,
                                    const rpc::Address *actor_addr) = 0;
 
-  virtual void PendingTaskFailed(const TaskID &task_id, rpc::ErrorType error_type,
+  virtual void PendingTaskFailed(const TaskID &task_id,
+                                 rpc::ErrorType error_type,
                                  Status *status = nullptr) = 0;
 
   virtual ~TaskFinisherInterface() {}
@@ -56,7 +58,8 @@ class TaskManager : public TaskFinisherInterface {
   /// \param[in] reply Proto response to a direct actor or task call.
   /// \param[in] actor_addr Address of the created actor, or nullptr.
   /// \return Void.
-  void CompletePendingTask(const TaskID &task_id, const rpc::PushTaskReply &reply,
+  void CompletePendingTask(const TaskID &task_id,
+                           const rpc::PushTaskReply &reply,
                            const rpc::Address *actor_addr) override;
 
   /// A pending task failed. This will either retry the task or mark the task
@@ -65,7 +68,8 @@ class TaskManager : public TaskFinisherInterface {
   /// \param[in] task_id ID of the pending task.
   /// \param[in] error_type The type of the specific error.
   /// \param[in] status Optional status message.
-  void PendingTaskFailed(const TaskID &task_id, rpc::ErrorType error_type,
+  void PendingTaskFailed(const TaskID &task_id,
+                         rpc::ErrorType error_type,
                          Status *status = nullptr) override;
 
   /// Return the spec for a pending task.
@@ -74,7 +78,8 @@ class TaskManager : public TaskFinisherInterface {
  private:
   /// Treat a pending task as failed. The lock should not be held when calling
   /// this method because it may trigger callbacks in this or other classes.
-  void MarkPendingTaskFailed(const TaskID &task_id, const TaskSpecification &spec,
+  void MarkPendingTaskFailed(const TaskID &task_id,
+                             const TaskSpecification &spec,
                              rpc::ErrorType error_type) LOCKS_EXCLUDED(mu_);
 
   /// Used to store task results.

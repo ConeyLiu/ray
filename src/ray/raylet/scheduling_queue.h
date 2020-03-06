@@ -182,8 +182,7 @@ class SchedulingQueue {
   /// Get a reference to the queue of ready tasks.
   ///
   /// \return A reference to the queue of ready tasks.
-  const std::unordered_map<SchedulingClass, ordered_set<TaskID>> &GetReadyTasksByClass()
-      const;
+  const std::unordered_map<SchedulingClass, ordered_set<TaskID>> &GetReadyTasksByClass() const;
 
   /// Get a task from the queue of a given state. The caller must ensure that
   /// the task has the given state.

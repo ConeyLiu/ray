@@ -71,8 +71,8 @@ class ResourceSet {
   ResourceSet();
 
   /// \brief Constructs ResourceSet from the specified resource map.
-  ResourceSet(
-      const std::unordered_map<std::string, FractionalResourceQuantity> &resource_map);
+  ResourceSet(const std::unordered_map<std::string,
+              FractionalResourceQuantity> &resource_map);
 
   /// \brief Constructs ResourceSet from the specified resource map.
   ResourceSet(const std::unordered_map<std::string, double> &resource_map);
@@ -131,8 +131,8 @@ class ResourceSet {
   ///
   /// \param other: The other resource set to add.
   /// \param total_resources: Total resource set which sets upper limits on capacity for
-  /// each label. \return True if the resource set was added successfully. False
-  /// otherwise.
+  /// each label.
+  /// \return True if the resource set was added successfully. False otherwise.
   void AddResourcesCapacityConstrained(const ResourceSet &other,
                                        const ResourceSet &total_resources);
 

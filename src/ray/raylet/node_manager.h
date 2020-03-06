@@ -72,7 +72,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   ///
   /// \param resource_config The initial set of node resources.
   /// \param object_manager A reference to the local object manager.
-  NodeManager(boost::asio::io_service &io_service, const NodeManagerConfig &config,
+  NodeManager(boost::asio::io_service &io_service,
+              const NodeManagerConfig &config,
               ObjectManager &object_manager,
               std::shared_ptr<gcs::RedisGcsClient> gcs_client,
               std::shared_ptr<ObjectDirectoryInterface> object_directory_);
@@ -92,7 +93,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \param message_data A pointer to the message data.
   /// \return Void.
   void ProcessClientMessage(const std::shared_ptr<LocalClientConnection> &client,
-                            int64_t message_type, const uint8_t *message_data);
+                            int64_t message_type,
+                            const uint8_t *message_data);
 
   /// Subscribe to the relevant GCS tables and set up handlers.
   ///
@@ -208,7 +210,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \param forwarded True if the task has been forwarded from a different
   /// node manager and false if it was submitted by a local worker.
   /// \return Void.
-  void SubmitTask(const Task &task, const Lineage &uncommitted_lineage,
+  void SubmitTask(const Task &task,
+                  const Lineage &uncommitted_lineage,
                   bool forwarded = false);
   /// Assign a task to a worker. The task is assumed to not be queued in local_queues_.
   ///
@@ -216,7 +219,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \param[in] task The task in question.
   /// \param[out] post_assign_callbacks Vector of callbacks that will be appended
   /// to with any logic that should run after the DispatchTasks loop runs.
-  void AssignTask(const std::shared_ptr<Worker> &worker, const Task &task,
+  void AssignTask(const std::shared_ptr<Worker> &worker,
+                  const Task &task,
                   std::vector<std::function<void()>> *post_assign_callbacks);
   /// Handle a worker finishing its assigned task.
   ///
@@ -249,7 +253,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \return Void.
   void FinishAssignedActorCreationTask(const ActorID &parent_actor_id,
                                        const TaskSpecification &task_spec,
-                                       bool resumed_from_checkpoint, int port);
+                                       bool resumed_from_checkpoint,
+                                       int port);
   /// Make a placement decision for placeable tasks given the resource_map
   /// provided. This will perform task state transitions and task forwarding.
   ///
@@ -287,7 +292,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \param node_id The ID of the node to forward the task to.
   /// \param on_error Callback on run on non-ok status.
   void ForwardTask(
-      const Task &task, const ClientID &node_id,
+      const Task &task,
+      const ClientID &node_id,
       const std::function<void(const ray::Status &, const Task &)> &on_error);
 
   /// Dispatch locally scheduled tasks. This attempts the transition from "scheduled" to
@@ -322,7 +328,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   /// \return Void.
   void AsyncResolveObjects(const std::shared_ptr<LocalClientConnection> &client,
                            const std::vector<ObjectID> &required_object_ids,
-                           const TaskID &current_task_id, bool ray_get,
+                           const TaskID &current_task_id,
+                           bool ray_get,
                            bool mark_worker_blocked);
 
   /// Handle end of a blocking object get. This could be a task assigned to a
@@ -337,7 +344,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler {
   ///                           blocked in AsyncResolveObjects().
   /// \return Void.
   void AsyncResolveObjectsFinish(const std::shared_ptr<LocalClientConnection> &client,
-                                 const TaskID &current_task_id, bool was_blocked);
+                                 const TaskID &current_task_id,
+                                 bool was_blocked);
 
   /// Handle a direct call task that is blocked. Note that this callback may
   /// arrive after the worker lease has been returned to the node manager.

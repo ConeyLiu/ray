@@ -17,7 +17,8 @@ namespace rpc {
 /// sent to the client.
 /// \param failure Failure callback which will be invoked when the reply fails to be
 /// sent to the client.
-using SendReplyCallback = std::function<void(Status status, std::function<void()> success,
+using SendReplyCallback = std::function<void(Status status,
+                                             std::function<void()> success,
                                              std::function<void()> failure)>;
 
 /// Represents state of a `ServerCall`.
@@ -92,7 +93,8 @@ class ServerCallFactory {
 /// \tparam Request Type of the request message.
 /// \tparam Reply Type of the reply message.
 template <class ServiceHandler, class Request, class Reply>
-using HandleRequestFunction = void (ServiceHandler::*)(const Request &, Reply *,
+using HandleRequestFunction = void (ServiceHandler::*)(const Request &,
+                                                       Reply *,
                                                        SendReplyCallback);
 
 /// Implementation of `ServerCall`. It represents `ServerCall` for a particular
@@ -111,7 +113,8 @@ class ServerCallImpl : public ServerCall {
   /// \param[in] handle_request_function Pointer to the service handler function.
   /// \param[in] io_service The event loop.
   ServerCallImpl(
-      const ServerCallFactory &factory, ServiceHandler &service_handler,
+      const ServerCallFactory &factory,
+      ServiceHandler &service_handler,
       HandleRequestFunction<ServiceHandler, Request, Reply> handle_request_function,
       boost::asio::io_service &io_service)
       : state_(ServerCallState::PENDING),
@@ -141,20 +144,20 @@ class ServerCallImpl : public ServerCall {
     // NOTE(hchen): This `factory` local variable is needed. Because `SendReply` runs in
     // a different thread, and will cause `this` to be deleted.
     const auto &factory = factory_;
-    (service_handler_.*handle_request_function_)(
-        request_, &reply_,
-        [this](Status status, std::function<void()> success,
-               std::function<void()> failure) {
-          // These two callbacks must be set before `SendReply`, because `SendReply`
-          // is async and this `ServerCall` might be deleted right after `SendReply`.
-          send_reply_success_callback_ = std::move(success);
-          send_reply_failure_callback_ = std::move(failure);
+    auto callback = [this](Status status,
+                           std::function<void()> success,
+                           std::function<void()> failure) {
+        // These two callbacks must be set before `SendReply`, because `SendReply`
+        // is async and this `ServerCall` might be deleted right after `SendReply`.
+        send_reply_success_callback_ = std::move(success);
+        send_reply_failure_callback_ = std::move(failure);
 
-          // When the handler is done with the request, tell gRPC to finish this request.
-          // Must send reply at the bottom of this callback, once we invoke this funciton,
-          // this server call might be deleted
-          SendReply(status);
-        });
+        // When the handler is done with the request, tell gRPC to finish this request.
+        // Must send reply at the bottom of this callback, once we invoke this funciton,
+        // this server call might be deleted
+        SendReply(status);
+    };
+    (service_handler_.*handle_request_function_)(request_, &reply_, callback);
     // We've finished handling this request,
     // create a new `ServerCall` to accept the next incoming request.
     factory.CreateCall();
@@ -226,8 +229,11 @@ class ServerCallImpl : public ServerCall {
 /// \tparam Reply Type of the reply message.
 template <class GrpcService, class Request, class Reply>
 using RequestCallFunction = void (GrpcService::AsyncService::*)(
-    grpc::ServerContext *, Request *, grpc_impl::ServerAsyncResponseWriter<Reply> *,
-    grpc::CompletionQueue *, grpc::ServerCompletionQueue *, void *);
+    grpc::ServerContext *,
+    Request *,
+    grpc_impl::ServerAsyncResponseWriter<Reply> *,
+    grpc::CompletionQueue *, grpc::ServerCompletionQueue *,
+    void *);
 
 /// Implementation of `ServerCallFactory`
 ///
@@ -244,7 +250,7 @@ class ServerCallFactoryImpl : public ServerCallFactory {
   ///
   /// \param[in] service The gRPC-generated `AsyncService`.
   /// \param[in] request_call_function Pointer to the `AsyncService::RequestMethod`
-  //  function.
+  ///  function.
   /// \param[in] service_handler The service handler that handles the request.
   /// \param[in] handle_request_function Pointer to the service handler function.
   /// \param[in] cq The `CompletionQueue`.
@@ -270,8 +276,11 @@ class ServerCallFactoryImpl : public ServerCallFactory {
         *this, service_handler_, handle_request_function_, io_service_);
     /// Request gRPC runtime to starting accepting this kind of request, using the call as
     /// the tag.
-    (service_.*request_call_function_)(&call->context_, &call->request_,
-                                       &call->response_writer_, cq_.get(), cq_.get(),
+    (service_.*request_call_function_)(&call->context_,
+                                       &call->request_,
+                                       &call->response_writer_,
+                                       cq_.get(),
+                                       cq_.get(),
                                        call);
   }
 

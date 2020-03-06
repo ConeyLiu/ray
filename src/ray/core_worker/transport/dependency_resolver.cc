@@ -11,7 +11,8 @@ struct TaskState {
   absl::flat_hash_set<ObjectID> local_dependencies;
 };
 
-void DoInlineObjectValue(const ObjectID &obj_id, std::shared_ptr<RayObject> value,
+void DoInlineObjectValue(const ObjectID &obj_id,
+                         std::shared_ptr<RayObject> value,
                          TaskSpecification &task) {
   auto &msg = task.GetMutableMessage();
   bool found = false;

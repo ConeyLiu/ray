@@ -18,8 +18,7 @@ ActorRegistration::ActorRegistration(const ActorTableData &actor_table_data)
 ActorRegistration::ActorRegistration(const ActorTableData &actor_table_data,
                                      const ActorCheckpointData &checkpoint_data)
     : actor_table_data_(actor_table_data),
-      execution_dependency_(
-          ObjectID::FromBinary(checkpoint_data.execution_dependency())) {
+      execution_dependency_(ObjectID::FromBinary(checkpoint_data.execution_dependency())) {
   // Restore `frontier_`.
   for (int64_t i = 0; i < checkpoint_data.handle_ids_size(); i++) {
     auto caller_id = TaskID::FromBinary(checkpoint_data.handle_ids(i));

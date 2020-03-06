@@ -25,7 +25,7 @@ struct ResourceRequest {
   /// Specify whether the request is soft or hard.
   /// If hard, the entire request is denied if the demand exceeds the resource
   /// availability. Otherwise, the request can be still be granted.
-  /// Prefernces are given to the nodes with the lowest number of violations.
+  /// Preferences are given to the nodes with the lowest number of violations.
   bool soft;
 };
 
@@ -137,7 +137,8 @@ class ClusterResourceScheduler {
   ///           least a hard constraints is violated.
   ///           >= 0, the number soft constraint violations. If 0, no
   ///           constraint is violated.
-  int64_t IsSchedulable(const TaskRequest &task_req, int64_t node_id,
+  int64_t IsSchedulable(const TaskRequest &task_req,
+                        int64_t node_id,
                         const NodeResources &resources);
 
   ///  Find a node in the cluster on which we can schedule a given task request.

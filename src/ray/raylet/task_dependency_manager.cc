@@ -25,6 +25,9 @@ bool TaskDependencyManager::CheckObjectLocal(const ObjectID &object_id) const {
   return local_objects_.count(object_id) == 1;
 }
 
+/**
+ *  Check whether the object need be transfered from remote nodes or reconstrcuted
+ */
 bool TaskDependencyManager::CheckObjectRequired(const ObjectID &object_id) const {
   const TaskID task_id = object_id.TaskId();
   auto task_entry = required_tasks_.find(task_id);
@@ -49,6 +52,10 @@ bool TaskDependencyManager::CheckObjectRequired(const ObjectID &object_id) const
   return true;
 }
 
+/**
+ * The object is been subscribed. So we ether transfer from remote nodes or
+ * reconstruct it.
+ */
 void TaskDependencyManager::HandleRemoteDependencyRequired(const ObjectID &object_id) {
   bool required = CheckObjectRequired(object_id);
   // If the object is required, then try to make the object available locally.
@@ -162,12 +169,14 @@ std::vector<TaskID> TaskDependencyManager::HandleObjectMissing(
 
 bool TaskDependencyManager::SubscribeGetDependencies(
     const TaskID &task_id, const std::vector<ObjectID> &required_objects) {
+  // get or create the TaskDependencies for the task_id
   auto &task_entry = task_dependencies_[task_id];
 
   // Record the task's dependencies.
   for (const auto &object_id : required_objects) {
     auto inserted = task_entry.get_dependencies.insert(object_id);
     if (inserted.second) {
+      // the object has not been inserted before
       RAY_LOG(DEBUG) << "Task " << task_id << " blocked on object " << object_id;
       // Get the ID of the task that creates the dependency.
       TaskID creating_task_id = object_id.TaskId();
@@ -318,8 +327,8 @@ void TaskDependencyManager::TaskPending(const Task &task) {
   RAY_LOG(DEBUG) << "Task execution " << task_id << " pending";
 
   // Record that the task is pending execution.
-  auto inserted =
-      pending_tasks_.emplace(task_id, PendingTask(initial_lease_period_ms_, io_service_));
+  auto inserted = pending_tasks_.emplace(
+          task_id, PendingTask(initial_lease_period_ms_,io_service_));
   if (inserted.second) {
     // This is the first time we've heard that this task is pending.  Find any
     // subscribed tasks that are dependent on objects created by the pending

@@ -51,6 +51,7 @@ std::pair<const ObjectBufferPool::ChunkInfo &, ray::Status> ObjectBufferPool::Ge
           errored_chunk_,
           ray::Status::IOError("Unable to obtain object chunk, object not local."));
     }
+    // | data | metadata |
     RAY_CHECK(object_buffer.metadata->data() ==
               object_buffer.data->data() + object_buffer.data->size());
     RAY_CHECK(data_size == static_cast<uint64_t>(object_buffer.data->size() +
@@ -84,7 +85,9 @@ void ObjectBufferPool::AbortGet(const ObjectID &object_id) {
 }
 
 std::pair<const ObjectBufferPool::ChunkInfo &, ray::Status> ObjectBufferPool::CreateChunk(
-    const ObjectID &object_id, uint64_t data_size, uint64_t metadata_size,
+    const ObjectID &object_id,
+    uint64_t data_size,
+    uint64_t metadata_size,
     uint64_t chunk_index) {
   std::lock_guard<std::mutex> lock(pool_mutex_);
   if (create_buffer_state_.count(object_id) == 0) {
@@ -92,8 +95,7 @@ std::pair<const ObjectBufferPool::ChunkInfo &, ray::Status> ObjectBufferPool::Cr
     int64_t object_size = data_size - metadata_size;
     // Try to create shared buffer.
     std::shared_ptr<Buffer> data;
-    arrow::Status s =
-        store_client_.Create(plasma_id, object_size, NULL, metadata_size, &data);
+    arrow::Status s = store_client_.Create(plasma_id, object_size, NULL, metadata_size, &data);
     std::vector<boost::asio::mutable_buffer> buffer;
     if (!s.ok()) {
       // Create failed. The object may already exist locally. If something else went

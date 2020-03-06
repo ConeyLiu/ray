@@ -18,8 +18,10 @@ class ActorHandle {
       : inner_(inner), actor_cursor_(ObjectID::FromBinary(inner_.actor_cursor())) {}
 
   // Constructs a new ActorHandle as part of the actor creation process.
-  ActorHandle(const ActorID &actor_id, const JobID &job_id,
-              const ObjectID &initial_cursor, const Language actor_language,
+  ActorHandle(const ActorID &actor_id,
+              const JobID &job_id,
+              const ObjectID &initial_cursor,
+              const Language actor_language,
               bool is_direct_call,
               const std::vector<std::string> &actor_creation_task_function_descriptor);
 
@@ -40,7 +42,8 @@ class ActorHandle {
 
   bool IsDirectCallActor() const { return inner_.is_direct_call(); }
 
-  void SetActorTaskSpec(TaskSpecBuilder &builder, const TaskTransportType transport_type,
+  void SetActorTaskSpec(TaskSpecBuilder &builder,
+                        const TaskTransportType transport_type,
                         const ObjectID new_cursor);
 
   void Serialize(std::string *output);

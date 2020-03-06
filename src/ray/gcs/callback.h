@@ -23,15 +23,13 @@ using StatusCallback = std::function<void(Status status)>;
 /// \param result The item returned by GCS. If the item to read doesn't exist,
 /// this optional object is empty.
 template <typename Data>
-using OptionalItemCallback =
-    std::function<void(Status status, const boost::optional<Data> &result)>;
+using OptionalItemCallback = std::function<void(Status status, const boost::optional<Data> &result)>;
 
 /// This callback is used to receive multiple items from GCS when a read completes.
 /// \param status Status indicates whether the read was successful.
 /// \param result The items returned by GCS.
 template <typename Data>
-using MultiItemCallback =
-    std::function<void(Status status, const std::vector<Data> &result)>;
+using MultiItemCallback = std::function<void(Status status, const std::vector<Data> &result)>;
 
 /// This callback is used to receive notifications of the subscribed items in the GCS.
 /// \param id The id of the item.

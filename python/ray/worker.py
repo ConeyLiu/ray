@@ -1126,8 +1126,7 @@ def connect(node,
         # This is the code path of driver mode.
         if job_id is None:
             # TODO(qwang): use `GcsClient::GenerateJobId()` here.
-            job_id = JobID.from_int(
-                int(worker.redis_client.incr("JobCounter")))
+            job_id = JobID.from_int(int(worker.redis_client.incr("JobCounter")))
         # When tasks are executed on remote workers in the context of multiple
         # drivers, the current job ID is used to keep track of which job is
         # responsible for the task so that error messages will be propagated to

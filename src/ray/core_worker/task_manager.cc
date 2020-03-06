@@ -47,15 +47,13 @@ void TaskManager::CompletePendingTask(const TaskID &task_id,
       std::shared_ptr<LocalMemoryBuffer> data_buffer;
       if (return_object.data().size() > 0) {
         data_buffer = std::make_shared<LocalMemoryBuffer>(
-            const_cast<uint8_t *>(
-                reinterpret_cast<const uint8_t *>(return_object.data().data())),
+            const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(return_object.data().data())),
             return_object.data().size());
       }
       std::shared_ptr<LocalMemoryBuffer> metadata_buffer;
       if (return_object.metadata().size() > 0) {
         metadata_buffer = std::make_shared<LocalMemoryBuffer>(
-            const_cast<uint8_t *>(
-                reinterpret_cast<const uint8_t *>(return_object.metadata().data())),
+            const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(return_object.metadata().data())),
             return_object.metadata().size());
       }
       RAY_CHECK_OK(
@@ -69,7 +67,8 @@ void TaskManager::CompletePendingTask(const TaskID &task_id,
   }
 }
 
-void TaskManager::PendingTaskFailed(const TaskID &task_id, rpc::ErrorType error_type,
+void TaskManager::PendingTaskFailed(const TaskID &task_id,
+                                    rpc::ErrorType error_type,
                                     Status *status) {
   // Note that this might be the __ray_terminate__ task, so we don't log
   // loudly with ERROR here.
@@ -131,7 +130,8 @@ void TaskManager::MarkPendingTaskFailed(const TaskID &task_id,
   int64_t num_returns = spec.NumReturns();
   for (int i = 0; i < num_returns; i++) {
     const auto object_id = ObjectID::ForTaskReturn(
-        task_id, /*index=*/i + 1,
+        task_id,
+        /*index=*/i + 1,
         /*transport_type=*/static_cast<int>(TaskTransportType::DIRECT));
     RAY_CHECK_OK(in_memory_store_->Put(RayObject(error_type), object_id));
   }

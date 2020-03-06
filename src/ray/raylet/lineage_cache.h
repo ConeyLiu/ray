@@ -211,7 +211,8 @@ class LineageCache {
   /// TODO(swang): Pass in the policy (interface?).
   LineageCache(const ClientID &client_id,
                gcs::TableInterface<TaskID, TaskTableData> &task_storage,
-               gcs::PubsubInterface<TaskID> &task_pubsub, uint64_t max_lineage_size);
+               gcs::PubsubInterface<TaskID> &task_pubsub,
+               uint64_t max_lineage_size);
 
   /// Asynchronously commit a task to the GCS.
   ///

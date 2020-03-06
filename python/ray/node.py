@@ -66,8 +66,7 @@ class Node(object):
         """
         if shutdown_at_exit:
             if connect_only:
-                raise ValueError("'shutdown_at_exit' and 'connect_only' "
-                                 "cannot both be true.")
+                raise ValueError("'shutdown_at_exit' and 'connect_only' cannot both be true.")
             self._register_shutdown_hooks()
 
         self.head = head
@@ -77,8 +76,7 @@ class Node(object):
         if ray_params.node_ip_address:
             node_ip_address = ray_params.node_ip_address
         elif ray_params.redis_address:
-            node_ip_address = ray.services.get_node_ip_address(
-                ray_params.redis_address)
+            node_ip_address = ray.services.get_node_ip_address(ray_params.redis_address)
         else:
             node_ip_address = ray.services.get_node_ip_address()
         self._node_ip_address = node_ip_address
@@ -114,8 +112,7 @@ class Node(object):
 
         if connect_only:
             # Get socket names from the configuration.
-            self._plasma_store_socket_name = (
-                ray_params.plasma_store_socket_name)
+            self._plasma_store_socket_name = ray_params.plasma_store_socket_name
             self._raylet_socket_name = ray_params.raylet_socket_name
 
             # If user does not provide the socket name, get it from Redis.
@@ -128,11 +125,9 @@ class Node(object):
                     self.redis_address,
                     self._node_ip_address,
                     redis_password=self.redis_password)
-                self._plasma_store_socket_name = address_info[
-                    "object_store_address"]
+                self._plasma_store_socket_name = address_info["object_store_address"]
                 self._raylet_socket_name = address_info["raylet_socket_name"]
-                self._ray_params.node_manager_port = address_info[
-                    "node_manager_port"]
+                self._ray_params.node_manager_port = address_info["node_manager_port"]
         else:
             # If the user specified a socket name, use it.
             self._plasma_store_socket_name = self._prepare_socket_file(
@@ -145,10 +140,8 @@ class Node(object):
             ray_params.update_if_absent(num_redis_shards=1, include_webui=True)
             self._webui_url = None
         else:
-            self._webui_url = (
-                ray.services.get_webui_url_from_redis(redis_client))
-            ray_params.include_java = (
-                ray.services.include_java_from_redis(redis_client))
+            self._webui_url = ray.services.get_webui_url_from_redis(redis_client)
+            ray_params.include_java = ray.services.include_java_from_redis(redis_client)
 
         if head or not connect_only:
             # We need to start a local raylet.

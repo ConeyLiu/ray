@@ -27,25 +27,53 @@ class CoreWorkerPlasmaStoreProvider {
 
   Status SetClientOptions(std::string name, int64_t limit_bytes);
 
+  /**
+   * Put the object into local plasma store
+   * @param object. The object that needs to be put.
+   * @param object_id. The object id which can be transfered into plasma id
+   */
   Status Put(const RayObject &object, const ObjectID &object_id);
 
-  Status Create(const std::shared_ptr<Buffer> &metadata, const size_t data_size,
-                const ObjectID &object_id, std::shared_ptr<Buffer> *data);
+  /**
+   * Create the data buffer in plasma store, then we can copy data into the buffer.
+   * @param data[output] the created plasma buffer
+   * @return the created status
+   */
+  Status Create(const std::shared_ptr<Buffer> &metadata,
+                const size_t data_size,
+                const ObjectID &object_id,
+                std::shared_ptr<Buffer> *data);
 
+  /**
+   * After the data copied to the plasma buffer, we should seal the buffer.
+   */
   Status Seal(const ObjectID &object_id);
 
-  Status Get(const absl::flat_hash_set<ObjectID> &object_ids, int64_t timeout_ms,
+  /**
+   *
+   * @param object_ids
+   * @param timeout_ms
+   * @param ctx
+   * @param results
+   * @param got_exception
+   * @return
+   */
+  Status Get(const absl::flat_hash_set<ObjectID> &object_ids,
+             int64_t timeout_ms,
              const WorkerContext &ctx,
              absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results,
              bool *got_exception);
 
   Status Contains(const ObjectID &object_id, bool *has_object);
 
-  Status Wait(const absl::flat_hash_set<ObjectID> &object_ids, int num_objects,
-              int64_t timeout_ms, const WorkerContext &ctx,
+  Status Wait(const absl::flat_hash_set<ObjectID> &object_ids,
+              int num_objects,
+              int64_t timeout_ms,
+              const WorkerContext &ctx,
               absl::flat_hash_set<ObjectID> *ready);
 
-  Status Delete(const absl::flat_hash_set<ObjectID> &object_ids, bool local_only,
+  Status Delete(const absl::flat_hash_set<ObjectID> &object_ids,
+                bool local_only,
                 bool delete_creating_tasks);
 
   std::string MemoryUsageString();
@@ -69,8 +97,11 @@ class CoreWorkerPlasmaStoreProvider {
   /// exception.
   /// \return Status.
   Status FetchAndGetFromPlasmaStore(
-      absl::flat_hash_set<ObjectID> &remaining, const std::vector<ObjectID> &batch_ids,
-      int64_t timeout_ms, bool fetch_only, bool in_direct_call_task,
+      absl::flat_hash_set<ObjectID> &remaining,
+      const std::vector<ObjectID> &batch_ids,
+      int64_t timeout_ms,
+      bool fetch_only,
+      bool in_direct_call_task,
       const TaskID &task_id,
       absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results,
       bool *got_exception);

@@ -38,11 +38,13 @@ class ReconstructionPolicy : public ReconstructionPolicyInterface {
   /// \param client_id The client ID to use when requesting notifications from
   /// the GCS.
   /// \param task_lease_pubsub The GCS pub-sub storage system to request task
+  /// \param task_reconstruction_log The task reconstruction log
   /// lease notifications from.
   ReconstructionPolicy(
       boost::asio::io_service &io_service,
       std::function<void(const TaskID &, const ObjectID &)> reconstruction_handler,
-      int64_t initial_reconstruction_timeout_ms, const ClientID &client_id,
+      int64_t initial_reconstruction_timeout_ms,
+      const ClientID &client_id,
       gcs::PubsubInterface<TaskID> &task_lease_pubsub,
       std::shared_ptr<ObjectDirectoryInterface> object_directory,
       gcs::LogInterface<TaskID, TaskReconstructionData> &task_reconstruction_log);
@@ -118,7 +120,8 @@ class ReconstructionPolicy : public ReconstructionPolicyInterface {
   /// reconstructing the task. This is used to suppress duplicate
   /// reconstructions of the same task (e.g., if a task creates two objects
   /// that both require reconstruction).
-  void AttemptReconstruction(const TaskID &task_id, const ObjectID &required_object_id,
+  void AttemptReconstruction(const TaskID &task_id,
+                             const ObjectID &required_object_id,
                              int reconstruction_attempt);
 
   /// Handle expiration of a task lease.
@@ -126,7 +129,8 @@ class ReconstructionPolicy : public ReconstructionPolicyInterface {
 
   /// Handle the response for an attempt at adding an entry to the task
   /// reconstruction log.
-  void HandleReconstructionLogAppend(const TaskID &task_id, const ObjectID &object_id,
+  void HandleReconstructionLogAppend(const TaskID &task_id,
+                                     const ObjectID &object_id,
                                      bool success);
 
   /// The event loop.

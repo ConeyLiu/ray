@@ -82,10 +82,10 @@ boost::optional<LineageEntry &> Lineage::GetEntryMutable(const TaskID &task_id) 
 }
 
 void Lineage::RemoveChild(const TaskID &parent_id, const TaskID &child_id) {
-  auto parent_it = children_.find(parent_id);
-  RAY_CHECK(parent_it->second.erase(child_id) == 1);
-  if (parent_it->second.empty()) {
-    children_.erase(parent_it);
+  auto children_it = children_.find(parent_id);
+  RAY_CHECK(children_it->second.erase(child_id) == 1);
+  if (children_it->second.empty()) {
+    children_.erase(children_it);
   }
 }
 
@@ -228,10 +228,11 @@ void LineageCache::MarkTaskAsForwarded(const TaskID &task_id, const ClientID &no
 }
 
 /// A helper function to get the uncommitted lineage of a task.
-void GetUncommittedLineageHelper(const TaskID &task_id, const Lineage &lineage_from,
-                                 Lineage &lineage_to, const ClientID &node_id) {
-  // If the entry is not found in the lineage to merge, then we stop since
-  // there is nothing to copy into the merged lineage.
+void GetUncommittedLineageHelper(const TaskID &task_id,
+                                 const Lineage &lineage_from,
+                                 Lineage &lineage_to,
+                                 const ClientID &node_id) {
+  // If the entry is not found in the lineage, then we stop
   auto entry = lineage_from.GetEntry(task_id);
   if (!entry) {
     return;
@@ -276,8 +277,11 @@ void LineageCache::FlushTask(const TaskID &task_id) {
   RAY_CHECK(entry->GetStatus() < GcsStatus::COMMITTING);
 
   gcs::raylet::TaskTable::WriteCallback task_callback =
-      [this](ray::gcs::RedisGcsClient *client, const TaskID &id,
-             const TaskTableData &data) { HandleEntryCommitted(id); };
+      [this](ray::gcs::RedisGcsClient *client,
+             const TaskID &id,
+             const TaskTableData &data) {
+      HandleEntryCommitted(id);
+  };
   auto task = lineage_.GetEntry(task_id);
   auto task_data = std::make_shared<TaskTableData>();
   task_data->mutable_task()->mutable_task_spec()->CopyFrom(
@@ -285,7 +289,7 @@ void LineageCache::FlushTask(const TaskID &task_id) {
   task_data->mutable_task()->mutable_task_execution_spec()->CopyFrom(
       task->TaskData().GetTaskExecutionSpec().GetMessage());
   RAY_CHECK_OK(task_storage_.Add(JobID(task->TaskData().GetTaskSpecification().JobId()),
-                                 task_id, task_data, task_callback));
+                                    task_id, task_data, task_callback));
 
   // We successfully wrote the task, so mark it as committing.
   // TODO(swang): Use a batched interface and write with all object entries.
@@ -298,8 +302,10 @@ bool LineageCache::SubscribeTask(const TaskID &task_id) {
   if (unsubscribed) {
     // Request notifications for the task if we haven't already requested
     // notifications for it.
-    RAY_CHECK_OK(task_pubsub_.RequestNotifications(JobID::Nil(), task_id, client_id_,
-                                                   /*done*/ nullptr));
+    RAY_CHECK_OK(task_pubsub_.RequestNotifications(JobID::Nil(),
+                                                      task_id,
+                                                      client_id_,
+                                                      /*done*/ nullptr));
   }
   // Return whether we were previously unsubscribed to this task and are now
   // subscribed.
@@ -312,8 +318,9 @@ bool LineageCache::UnsubscribeTask(const TaskID &task_id) {
   if (subscribed) {
     // Cancel notifications for the task if we previously requested
     // notifications for it.
-    RAY_CHECK_OK(task_pubsub_.CancelNotifications(JobID::Nil(), task_id, client_id_,
-                                                  /*done*/ nullptr));
+    RAY_CHECK_OK(task_pubsub_.CancelNotifications(JobID::Nil(),
+                                                     task_id, client_id_,
+                                                     /*done*/ nullptr));
     subscribed_tasks_.erase(it);
   }
   // Return whether we were previously subscribed to this task and are now

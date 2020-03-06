@@ -73,7 +73,8 @@ class TaskArg {
   }
 
  private:
-  TaskArg(const std::shared_ptr<ObjectID> id, const std::shared_ptr<RayObject> value)
+  TaskArg(const std::shared_ptr<ObjectID> id,
+          const std::shared_ptr<RayObject> value)
       : id_(id), value_(value) {}
 
   /// Id of the argument if passed by reference, otherwise nullptr.
@@ -85,7 +86,8 @@ class TaskArg {
 /// Options for all tasks (actor and non-actor) except for actor creation.
 struct TaskOptions {
   TaskOptions() {}
-  TaskOptions(int num_returns, bool is_direct_call,
+  TaskOptions(int num_returns,
+              bool is_direct_call,
               std::unordered_map<std::string, double> &resources)
       : num_returns(num_returns), is_direct_call(is_direct_call), resources(resources) {}
 
@@ -100,7 +102,8 @@ struct TaskOptions {
 /// Options for actor creation tasks.
 struct ActorCreationOptions {
   ActorCreationOptions() {}
-  ActorCreationOptions(uint64_t max_reconstructions, bool is_direct_call,
+  ActorCreationOptions(uint64_t max_reconstructions,
+                       bool is_direct_call,
                        int max_concurrency,
                        const std::unordered_map<std::string, double> &resources,
                        const std::unordered_map<std::string, double> &placement_resources,

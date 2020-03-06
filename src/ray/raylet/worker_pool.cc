@@ -40,7 +40,8 @@ namespace raylet {
 
 /// A constructor that initializes a worker pool with num_workers workers for
 /// each language.
-WorkerPool::WorkerPool(int num_workers, int maximum_startup_concurrency,
+WorkerPool::WorkerPool(int num_workers,
+                       int maximum_startup_concurrency,
                        std::shared_ptr<gcs::RedisGcsClient> gcs_client,
                        const WorkerCommandMap &worker_commands)
     : maximum_startup_concurrency_(maximum_startup_concurrency),
@@ -159,6 +160,7 @@ int WorkerPool::StartWorkerProcess(const Language &language,
         kWorkerDynamicOptionPlaceholderPrefix + std::to_string(dynamic_option_index);
 
     if (token == option_placeholder) {
+      // if the token should be replaced
       if (!dynamic_options.empty()) {
         RAY_CHECK(dynamic_option_index < dynamic_options.size());
         auto options = SplitStrByWhitespaces(dynamic_options[dynamic_option_index]);
@@ -169,6 +171,7 @@ int WorkerPool::StartWorkerProcess(const Language &language,
     } else {
       size_t num_workers_index = token.find(kWorkerNumWorkersPlaceholder);
       if (num_workers_index != std::string::npos) {
+        // replace the num workers per process place holder
         std::string arg = token;
         worker_command_args.push_back(arg.replace(num_workers_index,
                                                   strlen(kWorkerNumWorkersPlaceholder),

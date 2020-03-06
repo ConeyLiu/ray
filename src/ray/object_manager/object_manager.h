@@ -81,7 +81,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param request Push request including the object chunk data
   /// \param reply Reply to the sender
   /// \param send_reply_callback Callback of the request
-  void HandlePushRequest(const rpc::PushRequest &request, rpc::PushReply *reply,
+  void HandlePushRequest(const rpc::PushRequest &request,
+                         rpc::PushReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
   /// Handle pull request from remote object manager
@@ -107,13 +108,17 @@ class ObjectManager : public ObjectManagerInterface,
   /// contains only one chunk
   /// \param push_id Unique push id to indicate this push request
   /// \param object_id Object id
+  /// \param client_id the remote node id
   /// \param data_size Data size
   /// \param metadata_size Metadata size
   /// \param chunk_index Chunk index of this object chunk, start with 0
   /// \param rpc_client Rpc client used to send message to remote object manager
-  ray::Status SendObjectChunk(const UniqueID &push_id, const ObjectID &object_id,
-                              const ClientID &client_id, uint64_t data_size,
-                              uint64_t metadata_size, uint64_t chunk_index,
+  ray::Status SendObjectChunk(const UniqueID &push_id,
+                              const ObjectID &object_id,
+                              const ClientID &client_id,
+                              uint64_t data_size,
+                              uint64_t metadata_size,
+                              uint64_t chunk_index,
                               std::shared_ptr<rpc::ObjectManagerClient> rpc_client);
 
   /// Receive object chunk from remote object manager, small object may contain one chunk
@@ -124,15 +129,19 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param metadata_size Metadata size
   /// \param chunk_index Chunk index
   /// \param data Chunk data
-  ray::Status ReceiveObjectChunk(const ClientID &client_id, const ObjectID &object_id,
-                                 uint64_t data_size, uint64_t metadata_size,
-                                 uint64_t chunk_index, const std::string &data);
+  ray::Status ReceiveObjectChunk(const ClientID &client_id,
+                                 const ObjectID &object_id,
+                                 uint64_t data_size,
+                                 uint64_t metadata_size,
+                                 uint64_t chunk_index,
+                                 const std::string &data);
 
   /// Send pull request
   ///
   /// \param object_id Object id
   /// \param client_id Remote server client id
-  void SendPullRequest(const ObjectID &object_id, const ClientID &client_id,
+  void SendPullRequest(const ObjectID &object_id,
+                       const ClientID &client_id,
                        std::shared_ptr<rpc::ObjectManagerClient> rpc_client);
 
   /// Get the rpc client according to the client ID
@@ -223,8 +232,10 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param callback Invoked when either timeout_ms is satisfied OR num_ready_objects
   /// is satisfied.
   /// \return Status of whether the wait successfully initiated.
-  ray::Status Wait(const std::vector<ObjectID> &object_ids, int64_t timeout_ms,
-                   uint64_t num_required_objects, bool wait_local,
+  ray::Status Wait(const std::vector<ObjectID> &object_ids,
+                   int64_t timeout_ms,
+                   uint64_t num_required_objects,
+                   bool wait_local,
                    const WaitCallback &callback);
 
   /// Free a list of objects from object store.
@@ -259,7 +270,8 @@ class ObjectManager : public ObjectManagerInterface,
   };
 
   struct WaitState {
-    WaitState(boost::asio::io_service &service, int64_t timeout_ms,
+    WaitState(boost::asio::io_service &service,
+              int64_t timeout_ms,
               const WaitCallback &callback)
         : timeout_ms(timeout_ms),
           timeout_timer(std::unique_ptr<boost::asio::deadline_timer>(
@@ -286,8 +298,10 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Creates a wait request and adds it to active_wait_requests_.
   ray::Status AddWaitRequest(const UniqueID &wait_id,
-                             const std::vector<ObjectID> &object_ids, int64_t timeout_ms,
-                             uint64_t num_required_objects, bool wait_local,
+                             const std::vector<ObjectID> &object_ids,
+                             int64_t timeout_ms,
+                             uint64_t num_required_objects,
+                             bool wait_local,
                              const WaitCallback &callback);
 
   /// Lookup any remaining objects that are not local. This is invoked after
@@ -332,8 +346,11 @@ class ObjectManager : public ObjectManagerInterface,
   /// chunk.
   /// \param status The status of the send (e.g., did it succeed or fail).
   /// \return Void.
-  void HandleSendFinished(const ObjectID &object_id, const ClientID &client_id,
-                          uint64_t chunk_index, double start_time_us, double end_time_us,
+  void HandleSendFinished(const ObjectID &object_id,
+                          const ClientID &client_id,
+                          uint64_t chunk_index,
+                          double start_time_us,
+                          double end_time_us,
                           ray::Status status);
 
   /// This is used to notify the main thread that the receiving of a chunk has
@@ -348,9 +365,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// chunk.
   /// \param status The status of the receive (e.g., did it succeed or fail).
   /// \return Void.
-  void HandleReceiveFinished(const ObjectID &object_id, const ClientID &client_id,
-                             uint64_t chunk_index, double start_time_us,
-                             double end_time_us, ray::Status status);
+  void HandleReceiveFinished(const ObjectID &object_id,
+                             const ClientID &client_id,
+                             uint64_t chunk_index,
+                             double start_time_us,
+                             double end_time_us,
+                             ray::Status status);
 
   /// Handle Push task timeout.
   void HandlePushTaskTimeout(const ObjectID &object_id, const ClientID &client_id);

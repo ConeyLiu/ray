@@ -380,8 +380,7 @@ class Trainer(Trainable):
         # Create a default logger creator if no logger_creator is specified
         if logger_creator is None:
             timestr = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
-            logdir_prefix = "{}_{}_{}".format(self._name, self._env_id,
-                                              timestr)
+            logdir_prefix = "{}_{}_{}".format(self._name, self._env_id, timestr)
 
             def default_logger_creator(config):
                 """Creates a Unified logger with a default logdir prefix
@@ -389,8 +388,7 @@ class Trainer(Trainable):
                 """
                 if not os.path.exists(DEFAULT_RESULTS_DIR):
                     os.makedirs(DEFAULT_RESULTS_DIR)
-                logdir = tempfile.mkdtemp(
-                    prefix=logdir_prefix, dir=DEFAULT_RESULTS_DIR)
+                logdir = tempfile.mkdtemp(prefix=logdir_prefix, dir=DEFAULT_RESULTS_DIR)
                 return UnifiedLogger(config, logdir, loggers=None)
 
             logger_creator = default_logger_creator
@@ -421,8 +419,7 @@ class Trainer(Trainable):
 
         if self._has_policy_optimizer():
             self.global_vars["timestep"] = self.optimizer.num_steps_sampled
-            self.optimizer.workers.local_worker().set_global_vars(
-                self.global_vars)
+            self.optimizer.workers.local_worker().set_global_vars(self.global_vars)
             for w in self.optimizer.workers.remote_workers():
                 w.set_global_vars.remote(self.global_vars)
             logger.debug("updated global vars: {}".format(self.global_vars))
@@ -433,8 +430,7 @@ class Trainer(Trainable):
                 result = Trainable.train(self)
             except RayError as e:
                 if self.config["ignore_worker_failures"]:
-                    logger.exception(
-                        "Error in train call, attempting to recover")
+                    logger.exception("Error in train call, attempting to recover")
                     self._try_recover()
                 else:
                     logger.info(
@@ -461,14 +457,12 @@ class Trainer(Trainable):
                 self.workers.local_worker().filters))
 
         if self._has_policy_optimizer():
-            result["num_healthy_workers"] = len(
-                self.optimizer.workers.remote_workers())
+            result["num_healthy_workers"] = len(self.optimizer.workers.remote_workers())
 
         if self.config["evaluation_interval"]:
             if self._iteration % self.config["evaluation_interval"] == 0:
                 evaluation_metrics = self._evaluate()
-                assert isinstance(evaluation_metrics, dict), \
-                    "_evaluate() needs to return a dict."
+                assert isinstance(evaluation_metrics, dict), "_evaluate() needs to return a dict."
                 result.update(evaluation_metrics)
 
         return result
@@ -476,10 +470,7 @@ class Trainer(Trainable):
     @override(Trainable)
     def _log_result(self, result):
         if self.config["callbacks"].get("on_train_result"):
-            self.config["callbacks"]["on_train_result"]({
-                "trainer": self,
-                "result": result,
-            })
+            self.config["callbacks"]["on_train_result"]({"trainer": self, "result": result})
         # log after the callback is invoked, so that the user has a chance
         # to mutate the result
         Trainable._log_result(self, result)
@@ -530,8 +521,7 @@ class Trainer(Trainable):
                     "batch_mode": "complete_episodes",
                     "batch_steps": 1,
                 })
-                logger.debug(
-                    "using evaluation_config: {}".format(extra_config))
+                logger.debug("using evaluation_config: {}".format(extra_config))
                 self.evaluation_workers = self._make_workers(
                     self.env_creator,
                     self._policy,
@@ -762,27 +752,20 @@ class Trainer(Trainable):
     @staticmethod
     def _validate_config(config):
         if "policy_graphs" in config["multiagent"]:
-            logger.warning(
-                "The `policy_graphs` config has been renamed to `policies`.")
+            logger.warning("The `policy_graphs` config has been renamed to `policies`.")
             # Backwards compatibility
-            config["multiagent"]["policies"] = config["multiagent"][
-                "policy_graphs"]
+            config["multiagent"]["policies"] = config["multiagent"]["policy_graphs"]
             del config["multiagent"]["policy_graphs"]
         if "gpu" in config:
-            raise ValueError(
-                "The `gpu` config is deprecated, please use `num_gpus=0|1` "
-                "instead.")
+            raise ValueError("The `gpu` config is deprecated, please use `num_gpus=0|1` instead.")
         if "gpu_fraction" in config:
-            raise ValueError(
-                "The `gpu_fraction` config is deprecated, please use "
+            raise ValueError("The `gpu_fraction` config is deprecated, please use "
                 "`num_gpus=<fraction>` instead.")
         if "use_gpu_for_workers" in config:
-            raise ValueError(
-                "The `use_gpu_for_workers` config is deprecated, please use "
+            raise ValueError("The `use_gpu_for_workers` config is deprecated, please use "
                 "`num_gpus_per_worker=1` instead.")
         if type(config["input_evaluation"]) != list:
-            raise ValueError(
-                "`input_evaluation` must be a list of strings, got {}".format(
+            raise ValueError("`input_evaluation` must be a list of strings, got {}".format(
                     config["input_evaluation"]))
 
     def _try_recover(self):

@@ -14,7 +14,8 @@ namespace worker {
 
 class Profiler {
  public:
-  Profiler(WorkerContext &worker_context, const std::string &node_ip_address,
+  Profiler(WorkerContext &worker_context,
+           const std::string &node_ip_address,
            boost::asio::io_service &io_service,
            const std::shared_ptr<gcs::RedisGcsClient> &gcs_client);
 

@@ -13,8 +13,10 @@ namespace ray {
 namespace gcs {
 
 std::shared_ptr<gcs::ActorTableData> CreateActorTableData(
-    const TaskSpecification &task_spec, const rpc::Address &address,
-    gcs::ActorTableData::ActorState state, uint64_t remaining_reconstructions);
+    const TaskSpecification &task_spec,
+    const rpc::Address &address,
+    gcs::ActorTableData::ActorState state,
+    uint64_t remaining_reconstructions);
 
 class RedisGcsClient;
 
@@ -37,11 +39,13 @@ class RedisActorInfoAccessor : public ActorInfoAccessor {
                      const std::shared_ptr<ActorTableData> &data_ptr,
                      const StatusCallback &callback) override;
 
-  Status AsyncSubscribeAll(const SubscribeCallback<ActorID, ActorTableData> &subscribe,
+  Status AsyncSubscribeAll(const SubscribeCallback<ActorID,
+                           ActorTableData> &subscribe,
                            const StatusCallback &done) override;
 
   Status AsyncSubscribe(const ActorID &actor_id,
-                        const SubscribeCallback<ActorID, ActorTableData> &subscribe,
+                        const SubscribeCallback<ActorID,
+                        ActorTableData> &subscribe,
                         const StatusCallback &done) override;
 
   Status AsyncUnsubscribe(const ActorID &actor_id, const StatusCallback &done) override;
@@ -56,8 +60,7 @@ class RedisActorInfoAccessor : public ActorInfoAccessor {
   // TODO(micafan): Remove this random id, once GCS becomes a service.
   ClientID node_id_{ClientID::FromRandom()};
 
-  typedef SubscriptionExecutor<ActorID, ActorTableData, ActorTable>
-      ActorSubscriptionExecutor;
+  using ActorSubscriptionExecutor = SubscriptionExecutor<ActorID, ActorTableData, ActorTable>;
   ActorSubscriptionExecutor actor_sub_executor_;
 };
 

@@ -158,3 +158,5 @@ venv
 
 # tools
 tools/prometheus*
+
+.clwb

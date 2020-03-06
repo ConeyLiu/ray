@@ -13,7 +13,8 @@ ProfileEvent::ProfileEvent(const std::shared_ptr<Profiler> &profiler,
   rpc_event_.set_start_time(absl::GetCurrentTimeNanos() / 1e9);
 }
 
-Profiler::Profiler(WorkerContext &worker_context, const std::string &node_ip_address,
+Profiler::Profiler(WorkerContext &worker_context,
+                   const std::string &node_ip_address,
                    boost::asio::io_service &io_service,
                    const std::shared_ptr<gcs::RedisGcsClient> &gcs_client)
     : io_service_(io_service),

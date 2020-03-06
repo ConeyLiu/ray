@@ -18,7 +18,8 @@ ObjectManager::ObjectManager(asio::io_service &main_service,
       buffer_pool_(config_.store_socket_name, config_.object_chunk_size),
       rpc_work_(rpc_service_),
       gen_(std::chrono::high_resolution_clock::now().time_since_epoch().count()),
-      object_manager_server_("ObjectManager", config_.object_manager_port,
+      object_manager_server_("ObjectManager",
+                             config_.object_manager_port,
                              config_.rpc_service_threads_number),
       object_manager_service_(rpc_service_, *this),
       client_call_manager_(main_service, config_.rpc_service_threads_number) {
@@ -66,8 +67,7 @@ void ObjectManager::HandleObjectAdded(
   RAY_LOG(DEBUG) << "Object added " << object_id;
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
-  ray::Status status =
-      object_directory_->ReportObjectAdded(object_id, client_id_, object_info);
+  ray::Status status = object_directory_->ReportObjectAdded(object_id, client_id_, object_info);
 
   // Handle the unfulfilled_push_requests_ which contains the push request that is not
   // completed due to unsatisfied local objects.
@@ -94,8 +94,7 @@ void ObjectManager::NotifyDirectoryObjectDeleted(const ObjectID &object_id) {
   RAY_CHECK(it != local_objects_.end());
   auto object_info = it->second.object_info;
   local_objects_.erase(it);
-  ray::Status status =
-      object_directory_->ReportObjectRemoved(object_id, client_id_, object_info);
+  ray::Status status = object_directory_->ReportObjectRemoved(object_id, client_id_, object_info);
 }
 
 ray::Status ObjectManager::SubscribeObjAdded(
@@ -138,8 +137,7 @@ ray::Status ObjectManager::Pull(const ObjectID &object_id) {
         // NOTE(swang): Since we are overwriting the previous list of clients,
         // we may end up sending a duplicate request to the same client as
         // before.
-        it->second.client_locations =
-            std::vector<ClientID>(client_ids.begin(), client_ids.end());
+        it->second.client_locations = std::vector<ClientID>(client_ids.begin(), client_ids.end());
         if (it->second.client_locations.empty()) {
           // The object locations are now empty, so we should wait for the next
           // notification about a new object location.  Cancel the timer until
@@ -256,13 +254,14 @@ void ObjectManager::SendPullRequest(
   pull_request.set_object_id(object_id.Binary());
   pull_request.set_client_id(client_id_.Binary());
 
-  rpc_client->Pull(pull_request, [object_id, client_id](const Status &status,
-                                                        const rpc::PullReply &reply) {
-    if (!status.ok()) {
-      RAY_LOG(WARNING) << "Send pull " << object_id << " request to client " << client_id
-                       << " failed due to" << status.message();
-    }
-  });
+  auto callback = [object_id, client_id](const Status &status,
+                                         const rpc::PullReply &reply) {
+      if (!status.ok()) {
+          RAY_LOG(WARNING) << "Send pull " << object_id << " request to client " << client_id
+                           << " failed due to" << status.message();
+      }
+  };
+  rpc_client->Pull(pull_request, callback);
 }
 
 void ObjectManager::HandlePushTaskTimeout(const ObjectID &object_id,
@@ -279,8 +278,10 @@ void ObjectManager::HandlePushTaskTimeout(const ObjectID &object_id,
 }
 
 void ObjectManager::HandleSendFinished(const ObjectID &object_id,
-                                       const ClientID &client_id, uint64_t chunk_index,
-                                       double start_time, double end_time,
+                                       const ClientID &client_id,
+                                       uint64_t chunk_index,
+                                       double start_time,
+                                       double end_time,
                                        ray::Status status) {
   RAY_LOG(DEBUG) << "HandleSendFinished on " << client_id_ << " to " << client_id
                  << " of object " << object_id << " chunk " << chunk_index
@@ -386,10 +387,8 @@ void ObjectManager::Push(const ObjectID &object_id, const ClientID &client_id) {
 
   auto rpc_client = GetRpcClient(client_id);
   if (rpc_client) {
-    const object_manager::protocol::ObjectInfoT &object_info =
-        local_objects_[object_id].object_info;
-    uint64_t data_size =
-        static_cast<uint64_t>(object_info.data_size + object_info.metadata_size);
+    const object_manager::protocol::ObjectInfoT &object_info = local_objects_[object_id].object_info;
+    uint64_t data_size = static_cast<uint64_t>(object_info.data_size + object_info.metadata_size);
     uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
     uint64_t num_chunks = buffer_pool_.GetNumChunks(data_size);
 
@@ -417,8 +416,12 @@ void ObjectManager::Push(const ObjectID &object_id, const ClientID &client_id) {
 }
 
 ray::Status ObjectManager::SendObjectChunk(
-    const UniqueID &push_id, const ObjectID &object_id, const ClientID &client_id,
-    uint64_t data_size, uint64_t metadata_size, uint64_t chunk_index,
+    const UniqueID &push_id,
+    const ObjectID &object_id,
+    const ClientID &client_id,
+    uint64_t data_size,
+    uint64_t metadata_size,
+    uint64_t chunk_index,
     std::shared_ptr<rpc::ObjectManagerClient> rpc_client) {
   double start_time = absl::GetCurrentTimeNanos() / 1e9;
   rpc::PushRequest push_request;
@@ -479,8 +482,10 @@ void ObjectManager::CancelPull(const ObjectID &object_id) {
 }
 
 ray::Status ObjectManager::Wait(const std::vector<ObjectID> &object_ids,
-                                int64_t timeout_ms, uint64_t num_required_objects,
-                                bool wait_local, const WaitCallback &callback) {
+                                int64_t timeout_ms,
+                                uint64_t num_required_objects,
+                                bool wait_local,
+                                const WaitCallback &callback) {
   UniqueID wait_id = UniqueID::FromRandom();
   RAY_LOG(DEBUG) << "Wait request " << wait_id << " on " << client_id_;
   RAY_RETURN_NOT_OK(AddWaitRequest(wait_id, object_ids, timeout_ms, num_required_objects,
@@ -494,7 +499,8 @@ ray::Status ObjectManager::Wait(const std::vector<ObjectID> &object_ids,
 ray::Status ObjectManager::AddWaitRequest(const UniqueID &wait_id,
                                           const std::vector<ObjectID> &object_ids,
                                           int64_t timeout_ms,
-                                          uint64_t num_required_objects, bool wait_local,
+                                          uint64_t num_required_objects,
+                                          bool wait_local,
                                           const WaitCallback &callback) {
   if (wait_local) {
     return ray::Status::NotImplemented("Wait for local objects is not yet implemented.");

@@ -6,7 +6,8 @@
 #include "ray/gcs/redis_context.h"
 #include "ray/gcs/redis_job_info_accessor.h"
 
-static void GetRedisShards(redisContext *context, std::vector<std::string> &addresses,
+static void GetRedisShards(redisContext *context,
+                           std::vector<std::string> &addresses,
                            std::vector<int> &ports) {
   // Get the total number of Redis shards in the system.
   int num_attempts = 0;
@@ -113,7 +114,8 @@ Status RedisGcsClient::Connect(boost::asio::io_service &io_service) {
     for (size_t i = 0; i < addresses.size(); ++i) {
       // Populate shard_contexts.
       shard_contexts_.push_back(std::make_shared<RedisContext>(io_service));
-      RAY_CHECK_OK(shard_contexts_[i]->Connect(addresses[i], ports[i], /*sharding=*/true,
+      RAY_CHECK_OK(shard_contexts_[i]->Connect(addresses[i], ports[i],
+                                               /*sharding=*/true,
                                                /*password=*/options_.password_));
     }
   } else {

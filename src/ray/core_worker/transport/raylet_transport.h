@@ -9,10 +9,13 @@
 
 namespace ray {
 
+/**
+ * This class is used to handle the task assigned from raylet.
+ */
 class CoreWorkerRayletTaskReceiver {
  public:
-  using TaskHandler =
-      std::function<Status(const TaskSpecification &task_spec,
+  using TaskHandler = std::function<Status(
+                           const TaskSpecification &task_spec,
                            const std::shared_ptr<ResourceMappingType> &resource_ids,
                            std::vector<std::shared_ptr<RayObject>> *return_objects)>;
 

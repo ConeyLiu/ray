@@ -56,7 +56,8 @@ class ReferenceCounter {
   /// \param[in] owner_id The ID of the object's owner.
   /// \param[in] owner_address The address of the object's owner.
   /// \param[in] dependencies The objects that the object depends on.
-  void AddOwnedObject(const ObjectID &object_id, const TaskID &owner_id,
+  void AddOwnedObject(const ObjectID &object_id,
+                      const TaskID &owner_id,
                       const rpc::Address &owner_address,
                       std::shared_ptr<std::vector<ObjectID>> dependencies)
       LOCKS_EXCLUDED(mutex_);
@@ -67,10 +68,12 @@ class ReferenceCounter {
   /// \param[in] owner_id The ID of the owner of the object. This is either the
   /// task ID (for non-actors) or the actor ID of the owner.
   /// \param[in] owner_address The owner's address.
-  void AddBorrowedObject(const ObjectID &object_id, const TaskID &owner_id,
+  void AddBorrowedObject(const ObjectID &object_id,
+                         const TaskID &owner_id,
                          const rpc::Address &owner_address) LOCKS_EXCLUDED(mutex_);
 
-  bool GetOwner(const ObjectID &object_id, TaskID *owner_id,
+  bool GetOwner(const ObjectID &object_id,
+                TaskID *owner_id,
                 rpc::Address *owner_address) const LOCKS_EXCLUDED(mutex_);
 
   /// Returns the total number of ObjectIDs currently in scope.
@@ -91,13 +94,15 @@ class ReferenceCounter {
     /// Constructor for a reference whose origin is unknown.
     Reference() : owned_by_us(false) {}
     /// Constructor for a reference that we created.
-    Reference(const TaskID &owner_id, const rpc::Address &owner_address,
+    Reference(const TaskID &owner_id,
+              const rpc::Address &owner_address,
               std::shared_ptr<std::vector<ObjectID>> deps)
         : dependencies(std::move(deps)),
           owned_by_us(true),
           owner({owner_id, owner_address}) {}
     /// Constructor for a reference that was given to us.
-    Reference(const TaskID &owner_id, const rpc::Address &owner_address)
+    Reference(const TaskID &owner_id,
+              const rpc::Address &owner_address)
         : owned_by_us(false), owner({owner_id, owner_address}) {}
     /// The local ref count for the ObjectID in the language frontend.
     size_t local_ref_count = 0;

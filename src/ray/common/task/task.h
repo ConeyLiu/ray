@@ -9,13 +9,15 @@
 
 namespace ray {
 
-typedef std::function<void(const std::shared_ptr<void>, const std::string &, int,
-                           const WorkerID &, const ResourceIdSet &)>
-    DispatchTaskCallback;
+using DispatchTaskCallback = std::function<void(const std::shared_ptr<void>,
+                           const std::string &, int,
+                           const WorkerID &,
+                           const ResourceIdSet &)>;
 /// Arguments are the raylet ID to spill back to, the raylet's
 /// address and the raylet's port.
-typedef std::function<void(const ClientID &, const std::string &, int)>
-    SpillbackTaskCallback;
+using SpillbackTaskCallback = std::function<void(const ClientID &,
+                           const std::string &,
+                           int)>;
 
 /// \class Task
 ///
@@ -40,7 +42,8 @@ class Task {
 
   /// Construct a `Task` object from a `TaskSpecification` and a
   /// `TaskExecutionSpecification`.
-  Task(TaskSpecification task_spec, TaskExecutionSpecification task_execution_spec)
+  Task(TaskSpecification task_spec,
+       TaskExecutionSpecification task_execution_spec)
       : task_spec_(std::move(task_spec)),
         task_execution_spec_(std::move(task_execution_spec)) {
     ComputeDependencies();

@@ -6,10 +6,16 @@ namespace rpc {
 
 #define RAY_CORE_WORKER_RPC_HANDLER(HANDLER, CONCURRENCY)                             \
   std::unique_ptr<ServerCallFactory> HANDLER##_call_factory(                          \
-      new ServerCallFactoryImpl<CoreWorkerService, CoreWorker, HANDLER##Request,      \
+      new ServerCallFactoryImpl<CoreWorkerService,                                    \
+                                CoreWorker,                                           \
+                                HANDLER##Request,                                     \
                                 HANDLER##Reply>(                                      \
-          service_, &CoreWorkerService::AsyncService::Request##HANDLER, core_worker_, \
-          &CoreWorker::Handle##HANDLER, cq, main_service_));                          \
+          service_,                                                                   \
+          &CoreWorkerService::AsyncService::Request##HANDLER,                         \
+          core_worker_,                                                               \
+          &CoreWorker::Handle##HANDLER,                                               \
+          cq,                                                                         \
+          main_service_));                                                            \
   server_call_factories_and_concurrencies->emplace_back(                              \
       std::move(HANDLER##_call_factory), CONCURRENCY);
 

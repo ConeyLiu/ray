@@ -2,6 +2,8 @@
 
 #include "ray/stats/stats.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedValue"
 namespace ray {
 
 namespace raylet {
@@ -9,7 +11,8 @@ namespace raylet {
 ReconstructionPolicy::ReconstructionPolicy(
     boost::asio::io_service &io_service,
     std::function<void(const TaskID &, const ObjectID &)> reconstruction_handler,
-    int64_t initial_reconstruction_timeout_ms, const ClientID &client_id,
+    int64_t initial_reconstruction_timeout_ms,
+    const ClientID &client_id,
     gcs::PubsubInterface<TaskID> &task_lease_pubsub,
     std::shared_ptr<ObjectDirectoryInterface> object_directory,
     gcs::LogInterface<TaskID, TaskReconstructionData> &task_reconstruction_log)
@@ -31,8 +34,10 @@ void ReconstructionPolicy::SetTaskTimeout(
   task_it->second.reconstruction_timer->async_wait(
       [this, task_id](const boost::system::error_code &error) {
         if (!error) {
+          // expired
           auto it = listening_tasks_.find(task_id);
           if (it == listening_tasks_.end()) {
+            // the task has been removed from the listening_tasks
             return;
           }
           if (it->second.subscribed) {
@@ -52,9 +57,10 @@ void ReconstructionPolicy::SetTaskTimeout(
             // required by the task are no longer needed soon after.  If the
             // task is still required after this initial period, then we now
             // subscribe to task lease notifications.
-            RAY_CHECK_OK(task_lease_pubsub_.RequestNotifications(JobID::Nil(), task_id,
-                                                                 client_id_,
-                                                                 /*done*/ nullptr));
+            RAY_CHECK_OK(task_lease_pubsub_.RequestNotifications(JobID::Nil(),
+                                                                    task_id,
+                                                                    client_id_,
+                                                                    /*done*/ nullptr));
             it->second.subscribed = true;
           }
         } else {
@@ -113,12 +119,14 @@ void ReconstructionPolicy::AttemptReconstruction(const TaskID &task_id,
   RAY_CHECK_OK(task_reconstruction_log_.AppendAt(
       JobID::Nil(), task_id, reconstruction_entry,
       /*success_callback=*/
-      [this, required_object_id](gcs::RedisGcsClient *client, const TaskID &task_id,
+      [this, required_object_id](gcs::RedisGcsClient *client,
+                                 const TaskID &task_id,
                                  const TaskReconstructionData &data) {
         HandleReconstructionLogAppend(task_id, required_object_id, /*success=*/true);
       },
       /*failure_callback=*/
-      [this, required_object_id](gcs::RedisGcsClient *client, const TaskID &task_id,
+      [this, required_object_id](gcs::RedisGcsClient *client,
+                                 const TaskID &task_id,
                                  const TaskReconstructionData &data) {
         HandleReconstructionLogAppend(task_id, required_object_id, /*success=*/false);
       },
@@ -140,9 +148,10 @@ void ReconstructionPolicy::HandleTaskLeaseExpired(const TaskID &task_id) {
   // attempted asynchronously.
   for (const auto &created_object_id : it->second.created_objects) {
     RAY_CHECK_OK(object_directory_->LookupLocations(
-        created_object_id, [this, task_id, reconstruction_attempt](
-                               const ray::ObjectID &object_id,
-                               const std::unordered_set<ray::ClientID> &clients) {
+        created_object_id,
+        [this, task_id, reconstruction_attempt](
+                const ray::ObjectID &object_id,
+                const std::unordered_set<ray::ClientID> &clients) {
           if (clients.empty()) {
             // The required object no longer exists on any live nodes. Attempt
             // reconstruction.
@@ -224,3 +233,5 @@ void ReconstructionPolicy::RecordMetrics() const {
 }  // namespace raylet
 
 }  // end namespace ray
+
+#pragma clang diagnostic pop

@@ -353,6 +353,7 @@ class RolloutWorker(EvaluatorInterface):
                 policy_dict, policy_config)
 
         self.multiagent = set(self.policy_map.keys()) != {DEFAULT_POLICY_ID}
+        assert False, ""
         if self.multiagent:
             if not ((isinstance(self.env, MultiAgentEnv)
                      or isinstance(self.env, ExternalMultiAgentEnv))

@@ -123,15 +123,18 @@ class ClientCallManager {
   ///
   /// \param[in] main_service The main event loop, to which the callback functions will be
   /// posted.
-  explicit ClientCallManager(boost::asio::io_service &main_service, int num_threads = 1)
-      : main_service_(main_service), num_threads_(num_threads), shutdown_(false) {
+  explicit ClientCallManager(
+          boost::asio::io_service &main_service,
+          int num_threads = 1)
+      : main_service_(main_service),
+        num_threads_(num_threads),
+        shutdown_(false) {
     rr_index_ = rand() % num_threads_;
     // Start the polling threads.
     cqs_.reserve(num_threads_);
     for (int i = 0; i < num_threads_; i++) {
       cqs_.emplace_back();
-      polling_threads_.emplace_back(&ClientCallManager::PollEventsFromCompletionQueue,
-                                    this, i);
+      polling_threads_.emplace_back(&ClientCallManager::PollEventsFromCompletionQueue, this, i);
     }
   }
 
@@ -162,12 +165,15 @@ class ClientCallManager {
   std::shared_ptr<ClientCall> CreateCall(
       typename GrpcService::Stub &stub,
       const PrepareAsyncFunction<GrpcService, Request, Reply> prepare_async_function,
-      const Request &request, const ClientCallback<Reply> &callback) {
+      const Request &request,
+      const ClientCallback<Reply> &callback) {
     auto call = std::make_shared<ClientCallImpl<Reply>>(callback);
     // Send request.
     // Find the next completion queue to wait for response.
     call->response_reader_ = (stub.*prepare_async_function)(
-        &call->context_, request, &cqs_[rr_index_++ % num_threads_]);
+        &call->context_,
+        request,
+        &cqs_[rr_index_++ % num_threads_]);
     call->response_reader_->StartCall();
     // Create a new tag object. This object will eventually be deleted in the
     // `ClientCallManager::PollEventsFromCompletionQueue` when reply is received.

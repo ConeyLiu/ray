@@ -90,7 +90,8 @@ size_t TaskSpecification::NumReturns() const { return message_->num_returns(); }
 
 ObjectID TaskSpecification::ReturnId(size_t return_index,
                                      TaskTransportType transport_type) const {
-  return ObjectID::ForTaskReturn(TaskId(), return_index + 1,
+  return ObjectID::ForTaskReturn(TaskId(),
+                                 return_index + 1,
                                  static_cast<uint8_t>(transport_type));
 }
 

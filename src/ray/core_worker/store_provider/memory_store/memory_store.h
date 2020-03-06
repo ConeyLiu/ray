@@ -49,19 +49,25 @@ class CoreWorkerMemoryStore {
   /// finishes. This has no effect if ref counting is enabled.
   /// \param[out] results Result list of objects data.
   /// \return Status.
-  Status Get(const std::vector<ObjectID> &object_ids, int num_objects, int64_t timeout_ms,
-             const WorkerContext &ctx, bool remove_after_get,
+  Status Get(const std::vector<ObjectID> &object_ids,
+             int num_objects,
+             int64_t timeout_ms,
+             const WorkerContext &ctx,
+             bool remove_after_get,
              std::vector<std::shared_ptr<RayObject>> *results);
 
   /// Convenience wrapper around Get() that stores results in a given result map.
-  Status Get(const absl::flat_hash_set<ObjectID> &object_ids, int64_t timeout_ms,
+  Status Get(const absl::flat_hash_set<ObjectID> &object_ids,
+             int64_t timeout_ms,
              const WorkerContext &ctx,
              absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> *results,
              bool *got_exception);
 
   /// Convenience wrapper around Get() that stores ready objects in a given result set.
-  Status Wait(const absl::flat_hash_set<ObjectID> &object_ids, int num_objects,
-              int64_t timeout_ms, const WorkerContext &ctx,
+  Status Wait(const absl::flat_hash_set<ObjectID> &object_ids,
+              int num_objects,
+              int64_t timeout_ms,
+              const WorkerContext &ctx,
               absl::flat_hash_set<ObjectID> *ready);
 
   /// Asynchronously get an object from the object store. The object will not be removed
@@ -123,7 +129,7 @@ class CoreWorkerMemoryStore {
   /// mandatory once Java is supported.
   std::shared_ptr<ReferenceCounter> ref_counter_ = nullptr;
 
-  // If set, this will be used to notify worker blocked / unblocked on get calls.
+  /// If set, this will be used to notify worker blocked / unblocked on get calls.
   std::shared_ptr<raylet::RayletClient> raylet_client_ = nullptr;
 
   /// Protects the data structures below.
@@ -140,8 +146,7 @@ class CoreWorkerMemoryStore {
       object_get_requests_ GUARDED_BY(mu_);
 
   /// Map from object ID to its async get requests.
-  absl::flat_hash_map<ObjectID,
-                      std::vector<std::function<void(std::shared_ptr<RayObject>)>>>
+  absl::flat_hash_map<ObjectID, std::vector<std::function<void(std::shared_ptr<RayObject>)>>>
       object_async_get_requests_ GUARDED_BY(mu_);
 };
 

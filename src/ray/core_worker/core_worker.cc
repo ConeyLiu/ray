@@ -64,13 +64,18 @@ void GroupObjectIdsByStoreProvider(const std::vector<ObjectID> &object_ids,
 
 namespace ray {
 
-CoreWorker::CoreWorker(const WorkerType worker_type, const Language language,
-                       const std::string &store_socket, const std::string &raylet_socket,
-                       const JobID &job_id, const gcs::GcsClientOptions &gcs_options,
-                       const std::string &log_dir, const std::string &node_ip_address,
+CoreWorker::CoreWorker(const WorkerType worker_type,
+                       const Language language,
+                       const std::string &store_socket,
+                       const std::string &raylet_socket,
+                       const JobID &job_id,
+                       const gcs::GcsClientOptions &gcs_options,
+                       const std::string &log_dir,
+                       const std::string &node_ip_address,
                        int node_manager_port,
                        const TaskExecutionCallback &task_execution_callback,
-                       std::function<Status()> check_signals, bool ref_counting_enabled)
+                       std::function<Status()> check_signals,
+                       bool ref_counting_enabled)
     : worker_type_(worker_type),
       language_(language),
       log_dir_(log_dir),
@@ -390,7 +395,8 @@ Status CoreWorker::Seal(const ObjectID &object_id) {
   return plasma_store_provider_->Seal(object_id);
 }
 
-Status CoreWorker::Get(const std::vector<ObjectID> &ids, const int64_t timeout_ms,
+Status CoreWorker::Get(const std::vector<ObjectID> &ids,
+                       const int64_t timeout_ms,
                        std::vector<std::shared_ptr<RayObject>> *results) {
   results->resize(ids.size(), nullptr);
 

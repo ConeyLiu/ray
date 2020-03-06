@@ -53,7 +53,7 @@ class CoreWorker {
  public:
   /// Construct a CoreWorker instance.
   ///
-  /// \param[in] worker_type Type of this worker.
+  /// \param[in] worker_type Type of this worker: driver or worker
   /// \param[in] language Language of this worker.
   /// \param[in] store_socket Object store socket to connect to.
   /// \param[in] raylet_socket Raylet socket to connect to.
@@ -70,11 +70,16 @@ class CoreWorker {
   /// \param[in] ref_counting_enabled Whether to enable object ref counting.
   ///
   /// NOTE(zhijunfu): the constructor would throw if a failure happens.
-  CoreWorker(const WorkerType worker_type, const Language language,
-             const std::string &store_socket, const std::string &raylet_socket,
-             const JobID &job_id, const gcs::GcsClientOptions &gcs_options,
-             const std::string &log_dir, const std::string &node_ip_address,
-             int node_manager_port, const TaskExecutionCallback &task_execution_callback,
+  CoreWorker(const WorkerType worker_type,
+             const Language language,
+             const std::string &store_socket,
+             const std::string &raylet_socket,
+             const JobID &job_id,
+             const gcs::GcsClientOptions &gcs_options,
+             const std::string &log_dir,
+             const std::string &node_ip_address,
+             int node_manager_port,
+             const TaskExecutionCallback &task_execution_callback,
              std::function<Status()> check_signals = nullptr,
              bool ref_counting_enabled = false);
 
@@ -219,7 +224,8 @@ class CoreWorker {
   /// \param[in] timeout_ms Timeout in milliseconds, wait infinitely if it's negative.
   /// \param[out] results Result list of objects data.
   /// \return Status.
-  Status Get(const std::vector<ObjectID> &ids, const int64_t timeout_ms,
+  Status Get(const std::vector<ObjectID> &ids,
+             const int64_t timeout_ms,
              std::vector<std::shared_ptr<RayObject>> *results);
 
   /// Return whether or not the object store contains the given object.

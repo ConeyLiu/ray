@@ -40,30 +40,38 @@ namespace ray {
 namespace gcs {
 
 template <typename ID, typename Data>
-Status Log<ID, Data>::Append(const JobID &job_id, const ID &id,
+Status Log<ID, Data>::Append(const JobID &job_id,
+                             const ID &id,
                              const std::shared_ptr<Data> &data,
                              const WriteCallback &done) {
   num_appends_++;
   auto callback = [this, id, data, done](std::shared_ptr<CallbackReply> reply) {
     const auto status = reply->ReadAsStatus();
     // Failed to append the entry.
-    RAY_CHECK(status.ok()) << "Failed to execute command TABLE_APPEND:"
-                           << status.ToString();
+    RAY_CHECK(status.ok())
+      << "Failed to execute command TABLE_APPEND:" << status.ToString();
     if (done != nullptr) {
       (done)(client_, id, *data);
     }
   };
   std::string str = data->SerializeAsString();
-  return GetRedisContext(id)->RunAsync(GetLogAppendCommand(command_type_), id, str.data(),
-                                       str.length(), prefix_, pubsub_channel_,
-                                       std::move(callback));
+  return GetRedisContext(id)->RunAsync(
+          GetLogAppendCommand(command_type_),
+          id,
+          str.data(), str.length(),
+          prefix_,
+          pubsub_channel_,
+          std::move(callback));
 }
 
 template <typename ID, typename Data>
-Status Log<ID, Data>::AppendAt(const JobID &job_id, const ID &id,
-                               const std::shared_ptr<Data> &data,
-                               const WriteCallback &done, const WriteCallback &failure,
-                               int log_length) {
+Status Log<ID, Data>::AppendAt(
+        const JobID &job_id,
+        const ID &id,
+        const std::shared_ptr<Data> &data,
+        const WriteCallback &done,
+        const WriteCallback &failure,
+        int log_length) {
   num_appends_++;
   auto callback = [this, id, data, done, failure](std::shared_ptr<CallbackReply> reply) {
     const auto status = reply->ReadAsStatus();
@@ -78,9 +86,14 @@ Status Log<ID, Data>::AppendAt(const JobID &job_id, const ID &id,
     }
   };
   std::string str = data->SerializeAsString();
-  return GetRedisContext(id)->RunAsync(GetLogAppendCommand(command_type_), id, str.data(),
-                                       str.length(), prefix_, pubsub_channel_,
-                                       std::move(callback), log_length);
+  return GetRedisContext(id)->RunAsync(
+          GetLogAppendCommand(command_type_),
+          /* data id */id,
+          /* data */str.data(), str.length(),
+          prefix_,
+          pubsub_channel_,
+          std::move(callback),
+          log_length);
 }
 
 template <typename ID, typename Data>
@@ -103,8 +116,13 @@ Status Log<ID, Data>::Lookup(const JobID &job_id, const ID &id, const Callback &
     }
   };
   std::vector<uint8_t> nil;
-  return GetRedisContext(id)->RunAsync("RAY.TABLE_LOOKUP", id, nil.data(), nil.size(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync(
+          "RAY.TABLE_LOOKUP",
+          id,
+          nil.data(), nil.size(),
+          prefix_,
+          pubsub_channel_,
+          std::move(callback));
 }
 
 template <typename ID, typename Data>
@@ -121,7 +139,8 @@ Status Log<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
 }
 
 template <typename ID, typename Data>
-Status Log<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
+Status Log<ID, Data>::Subscribe(const JobID &job_id,
+                                const ClientID &client_id,
                                 const NotificationCallback &subscribe,
                                 const SubscriptionCallback &done) {
   RAY_CHECK(subscribe_callback_index_ == -1)
@@ -155,8 +174,10 @@ Status Log<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
 
   subscribe_callback_index_ = 1;
   for (auto &context : shard_contexts_) {
-    RAY_RETURN_NOT_OK(context->SubscribeAsync(client_id, pubsub_channel_, callback,
-                                              &subscribe_callback_index_));
+    RAY_RETURN_NOT_OK(context->SubscribeAsync(client_id,
+                                                 pubsub_channel_,
+                                                 callback,
+                                                 &subscribe_callback_index_));
   }
   return Status::OK();
 }
@@ -178,9 +199,12 @@ Status Log<ID, Data>::RequestNotifications(const JobID &job_id, const ID &id,
     };
   }
 
-  return GetRedisContext(id)->RunAsync("RAY.TABLE_REQUEST_NOTIFICATIONS", id,
-                                       client_id.Data(), client_id.Size(), prefix_,
-                                       pubsub_channel_, callback);
+  return GetRedisContext(id)->RunAsync("RAY.TABLE_REQUEST_NOTIFICATIONS",
+                                       id,
+                                       client_id.Data(), client_id.Size(),
+                                       prefix_,
+                                       pubsub_channel_,
+                                       callback);
 }
 
 template <typename ID, typename Data>
@@ -213,8 +237,7 @@ void Log<ID, Data>::Delete(const JobID &job_id, const std::vector<ID> &ids) {
     sharded_data[GetRedisContext(id).get()] << id.Binary();
   }
   // Breaking really large deletion commands into batches of smaller size.
-  const size_t batch_size =
-      RayConfig::instance().maximum_gcs_deletion_batch_size() * ID::Size();
+  const size_t batch_size = RayConfig::instance().maximum_gcs_deletion_batch_size() * ID::Size();
   for (const auto &pair : sharded_data) {
     std::string current_data = pair.second.str();
     for (size_t cur = 0; cur < pair.second.str().size(); cur += batch_size) {
@@ -229,10 +252,12 @@ void Log<ID, Data>::Delete(const JobID &job_id, const std::vector<ID> &ids) {
                       data_field_size, buffer + sizeof(uint16_t)));
 
       RAY_IGNORE_EXPR(
-          pair.first->RunAsync("RAY.TABLE_DELETE", UniqueID::Nil(),
-                               reinterpret_cast<const uint8_t *>(send_data.c_str()),
-                               send_data.size(), prefix_, pubsub_channel_,
-                               /*redisCallback=*/nullptr));
+          pair.first->RunAsync("RAY.TABLE_DELETE",
+                                    UniqueID::Nil(),
+                                    reinterpret_cast<const uint8_t *>(send_data.c_str()), send_data.size(),
+                                    prefix_,
+                                    pubsub_channel_,
+                                    /*redisCallback=*/nullptr));
     }
   }
 }
@@ -266,44 +291,47 @@ Status Table<ID, Data>::Add(const JobID &job_id, const ID &id,
 }
 
 template <typename ID, typename Data>
-Status Table<ID, Data>::Lookup(const JobID &job_id, const ID &id, const Callback &lookup,
+Status Table<ID, Data>::Lookup(const JobID &job_id,
+                               const ID &id,
+                               const Callback &lookup,
                                const FailureCallback &failure) {
   num_lookups_++;
-  return Log<ID, Data>::Lookup(job_id, id,
-                               [lookup, failure](RedisGcsClient *client, const ID &id,
-                                                 const std::vector<Data> &data) {
-                                 if (data.empty()) {
-                                   if (failure != nullptr) {
-                                     (failure)(client, id);
-                                   }
-                                 } else {
-                                   RAY_CHECK(data.size() == 1);
-                                   if (lookup != nullptr) {
-                                     (lookup)(client, id, data[0]);
-                                   }
-                                 }
-                               });
+  auto callback = [lookup, failure](RedisGcsClient *client,
+                                    const ID &id,
+                                    const std::vector<Data> &data) {
+      if (data.empty()) {
+          if (failure != nullptr) {
+              (failure)(client, id);
+          }
+      } else {
+          RAY_CHECK(data.size() == 1);
+          if (lookup != nullptr) {
+              (lookup)(client, id, data[0]);
+          }
+      }
+  };
+  return Log<ID, Data>::Lookup(job_id, id, callback);
 }
 
 template <typename ID, typename Data>
-Status Table<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
+Status Table<ID, Data>::Subscribe(const JobID &job_id,
+                                  const ClientID &client_id,
                                   const Callback &subscribe,
                                   const FailureCallback &failure,
                                   const SubscriptionCallback &done) {
-  return Log<ID, Data>::Subscribe(
-      job_id, client_id,
-      [subscribe, failure](RedisGcsClient *client, const ID &id,
-                           const std::vector<Data> &data) {
+    auto callback = [subscribe, failure](RedisGcsClient *client,
+                                         const ID &id,
+                                         const std::vector<Data> &data) {
         RAY_CHECK(data.empty() || data.size() == 1);
         if (data.size() == 1) {
-          subscribe(client, id, data[0]);
+            subscribe(client, id, data[0]);
         } else {
-          if (failure != nullptr) {
-            failure(client, id);
-          }
+            if (failure != nullptr) {
+                failure(client, id);
+            }
         }
-      },
-      done);
+    };
+    return Log<ID, Data>::Subscribe(job_id, client_id, callback, done);
 }
 
 template <typename ID, typename Data>
@@ -314,8 +342,10 @@ std::string Table<ID, Data>::DebugString() const {
 }
 
 template <typename ID, typename Data>
-Status Set<ID, Data>::Add(const JobID &job_id, const ID &id,
-                          const std::shared_ptr<Data> &data, const WriteCallback &done) {
+Status Set<ID, Data>::Add(const JobID &job_id,
+                          const ID &id,
+                          const std::shared_ptr<Data> &data,
+                          const WriteCallback &done) {
   num_adds_++;
   auto callback = [this, id, data, done](std::shared_ptr<CallbackReply> reply) {
     if (done != nullptr) {
@@ -323,12 +353,18 @@ Status Set<ID, Data>::Add(const JobID &job_id, const ID &id,
     }
   };
   std::string str = data->SerializeAsString();
-  return GetRedisContext(id)->RunAsync("RAY.SET_ADD", id, str.data(), str.length(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync(
+          "RAY.SET_ADD",
+          id,
+          str.data(), str.length(),
+          prefix_,
+          pubsub_channel_,
+          std::move(callback));
 }
 
 template <typename ID, typename Data>
-Status Set<ID, Data>::Remove(const JobID &job_id, const ID &id,
+Status Set<ID, Data>::Remove(const JobID &job_id,
+                             const ID &id,
                              const std::shared_ptr<Data> &data,
                              const WriteCallback &done) {
   num_removes_++;
@@ -338,8 +374,13 @@ Status Set<ID, Data>::Remove(const JobID &job_id, const ID &id,
     }
   };
   std::string str = data->SerializeAsString();
-  return GetRedisContext(id)->RunAsync("RAY.SET_REMOVE", id, str.data(), str.length(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync(
+          "RAY.SET_REMOVE",
+          id,
+          str.data(), str.length(),
+          prefix_,
+          pubsub_channel_,
+          std::move(callback));
 }
 
 template <typename ID, typename Data>
@@ -351,7 +392,9 @@ std::string Set<ID, Data>::DebugString() const {
 }
 
 template <typename ID, typename Data>
-Status Hash<ID, Data>::Update(const JobID &job_id, const ID &id, const DataMap &data_map,
+Status Hash<ID, Data>::Update(const JobID &job_id,
+                              const ID &id,
+                              const DataMap &data_map,
                               const HashCallback &done) {
   num_adds_++;
   auto callback = [this, id, data_map, done](std::shared_ptr<CallbackReply> reply) {
@@ -367,17 +410,21 @@ Status Hash<ID, Data>::Update(const JobID &job_id, const ID &id, const DataMap &
     gcs_entry.add_entries(pair.second->SerializeAsString());
   }
   std::string str = gcs_entry.SerializeAsString();
-  return GetRedisContext(id)->RunAsync("RAY.HASH_UPDATE", id, str.data(), str.size(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync("RAY.HASH_UPDATE",
+                                       id,
+                                       str.data(), str.size(),
+                                       prefix_,
+                                       pubsub_channel_,
+                                       std::move(callback));
 }
 
 template <typename ID, typename Data>
-Status Hash<ID, Data>::RemoveEntries(const JobID &job_id, const ID &id,
+Status Hash<ID, Data>::RemoveEntries(const JobID &job_id,
+                                     const ID &id,
                                      const std::vector<std::string> &keys,
                                      const HashRemoveCallback &remove_callback) {
   num_removes_++;
-  auto callback = [this, id, keys,
-                   remove_callback](std::shared_ptr<CallbackReply> reply) {
+  auto callback = [this, id, keys, remove_callback](std::shared_ptr<CallbackReply> reply) {
     if (remove_callback != nullptr) {
       (remove_callback)(client_, id, keys);
     }
@@ -389,8 +436,12 @@ Status Hash<ID, Data>::RemoveEntries(const JobID &job_id, const ID &id,
     gcs_entry.add_entries(key);
   }
   std::string str = gcs_entry.SerializeAsString();
-  return GetRedisContext(id)->RunAsync("RAY.HASH_UPDATE", id, str.data(), str.size(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync("RAY.HASH_UPDATE",
+                                       id,
+                                       str.data(), str.size(),
+                                       prefix_,
+                                       pubsub_channel_,
+                                       std::move(callback));
 }
 
 template <typename ID, typename Data>
@@ -402,7 +453,8 @@ std::string Hash<ID, Data>::DebugString() const {
 }
 
 template <typename ID, typename Data>
-Status Hash<ID, Data>::Lookup(const JobID &job_id, const ID &id,
+Status Hash<ID, Data>::Lookup(const JobID &job_id,
+                              const ID &id,
                               const HashCallback &lookup) {
   num_lookups_++;
   auto callback = [this, id, lookup](std::shared_ptr<CallbackReply> reply) {
@@ -425,12 +477,17 @@ Status Hash<ID, Data>::Lookup(const JobID &job_id, const ID &id,
     }
   };
   std::vector<uint8_t> nil;
-  return GetRedisContext(id)->RunAsync("RAY.TABLE_LOOKUP", id, nil.data(), nil.size(),
-                                       prefix_, pubsub_channel_, std::move(callback));
+  return GetRedisContext(id)->RunAsync("RAY.TABLE_LOOKUP",
+                                       id,
+                                       nil.data(), nil.size(),
+                                       prefix_,
+                                       pubsub_channel_,
+                                       std::move(callback));
 }
 
 template <typename ID, typename Data>
-Status Hash<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
+Status Hash<ID, Data>::Subscribe(const JobID &job_id,
+                                 const ClientID &client_id,
                                  const HashNotificationCallback &subscribe,
                                  const SubscriptionCallback &done) {
   RAY_CHECK(subscribe_callback_index_ == -1)
@@ -471,14 +528,19 @@ Status Hash<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
 
   subscribe_callback_index_ = 1;
   for (auto &context : shard_contexts_) {
-    RAY_RETURN_NOT_OK(context->SubscribeAsync(client_id, pubsub_channel_, callback,
-                                              &subscribe_callback_index_));
+    RAY_RETURN_NOT_OK(context->SubscribeAsync(client_id,
+                                                 pubsub_channel_,
+                                                 callback,
+                                                 &subscribe_callback_index_));
   }
   return Status::OK();
 }
 
-Status ErrorTable::PushErrorToDriver(const JobID &job_id, const std::string &type,
-                                     const std::string &error_message, double timestamp) {
+Status ErrorTable::PushErrorToDriver(
+        const JobID &job_id,
+        const std::string &type,
+        const std::string &error_message,
+        double timestamp) {
   auto data = std::make_shared<ErrorTableData>();
   data->set_job_id(job_id.Binary());
   data->set_type(type);
@@ -495,8 +557,7 @@ Status ProfileTable::AddProfileEventBatch(const ProfileTableData &profile_events
   // TODO(hchen): Change the parameter to shared_ptr to avoid copying data.
   auto data = std::make_shared<ProfileTableData>();
   data->CopyFrom(profile_events);
-  return Append(JobID::Nil(), UniqueID::FromRandom(), data,
-                /*done_callback=*/nullptr);
+  return Append(JobID::Nil(), UniqueID::FromRandom(), data, /*done_callback=*/nullptr);
 }
 
 std::string ProfileTable::DebugString() const {
@@ -599,13 +660,15 @@ Status ClientTable::Connect(const GcsNodeInfo &local_node_info) {
   data->set_state(GcsNodeInfo::ALIVE);
   // Callback to handle our own successful connection once we've added
   // ourselves.
-  auto add_callback = [this](RedisGcsClient *client, const UniqueID &log_key,
+  auto add_callback = [this](RedisGcsClient *client,
+                             const UniqueID &log_key,
                              const GcsNodeInfo &data) {
     RAY_CHECK(log_key == client_log_key_);
     HandleConnected(client, data);
 
     // Callback for a notification from the client table.
-    auto notification_callback = [this](RedisGcsClient *client, const UniqueID &log_key,
+    auto notification_callback = [this](RedisGcsClient *client,
+                                        const UniqueID &log_key,
                                         const std::vector<GcsNodeInfo> &notifications) {
       RAY_CHECK(log_key == client_log_key_);
       std::unordered_map<std::string, GcsNodeInfo> connected_nodes;
@@ -633,12 +696,12 @@ Status ClientTable::Connect(const GcsNodeInfo &local_node_info) {
     // Callback to request notifications from the client table once we've
     // successfully subscribed.
     auto subscription_callback = [this](RedisGcsClient *c) {
-      RAY_CHECK_OK(RequestNotifications(JobID::Nil(), client_log_key_, node_id_,
-                                        /*done*/ nullptr));
+      // the request update id is client_log_key_ and the client id is node_id
+      RAY_CHECK_OK(RequestNotifications(
+              JobID::Nil(), client_log_key_, node_id_, /*done*/ nullptr));
     };
-    // Subscribe to the client table.
-    RAY_CHECK_OK(
-        Subscribe(JobID::Nil(), node_id_, notification_callback, subscription_callback));
+    // Subscribe to the client table. The channle is channel_str + node_id
+    RAY_CHECK_OK(Subscribe(JobID::Nil(), node_id_, notification_callback, subscription_callback));
   };
   return Append(JobID::Nil(), client_log_key_, data, add_callback);
 }
@@ -646,7 +709,8 @@ Status ClientTable::Connect(const GcsNodeInfo &local_node_info) {
 Status ClientTable::Disconnect(const DisconnectCallback &callback) {
   auto node_info = std::make_shared<GcsNodeInfo>(local_node_info_);
   node_info->set_state(GcsNodeInfo::DEAD);
-  auto add_callback = [this, callback](RedisGcsClient *client, const ClientID &id,
+  auto add_callback = [this, callback](RedisGcsClient *client,
+                                       const ClientID &id,
                                        const GcsNodeInfo &data) {
     HandleConnected(client, data);
     RAY_CHECK_OK(
@@ -701,10 +765,10 @@ Status ActorCheckpointIdTable::AddCheckpointId(const JobID &job_id,
                                                const ActorID &actor_id,
                                                const ActorCheckpointID &checkpoint_id) {
   auto lookup_callback = [this, checkpoint_id, job_id, actor_id](
-                             ray::gcs::RedisGcsClient *client, const ActorID &id,
+                             ray::gcs::RedisGcsClient *client,
+                             const ActorID &id,
                              const ActorCheckpointIdData &data) {
-    std::shared_ptr<ActorCheckpointIdData> copy =
-        std::make_shared<ActorCheckpointIdData>(data);
+    std::shared_ptr<ActorCheckpointIdData> copy = std::make_shared<ActorCheckpointIdData>(data);
     copy->add_timestamps(absl::GetCurrentTimeNanos() / 1000000);
     copy->add_checkpoint_ids(checkpoint_id.Binary());
     auto num_to_keep = RayConfig::instance().num_actor_checkpoints_to_keep();
@@ -718,9 +782,9 @@ Status ActorCheckpointIdTable::AddCheckpointId(const JobID &job_id,
     RAY_CHECK_OK(Add(job_id, actor_id, copy, nullptr));
   };
   auto failure_callback = [this, checkpoint_id, job_id, actor_id](
-                              ray::gcs::RedisGcsClient *client, const ActorID &id) {
-    std::shared_ptr<ActorCheckpointIdData> data =
-        std::make_shared<ActorCheckpointIdData>();
+                              ray::gcs::RedisGcsClient *client,
+                              const ActorID &id) {
+    std::shared_ptr<ActorCheckpointIdData> data = std::make_shared<ActorCheckpointIdData>();
     data->set_actor_id(id.Binary());
     data->add_timestamps(absl::GetCurrentTimeNanos() / 1000000);
     *data->add_checkpoint_ids() = checkpoint_id.Binary();

@@ -6,7 +6,8 @@ namespace gcs {
 
 template <typename ID, typename Data, typename Table>
 Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribeAll(
-    const ClientID &client_id, const SubscribeCallback<ID, Data> &subscribe,
+    const ClientID &client_id,
+    const SubscribeCallback<ID, Data> &subscribe,
     const StatusCallback &done) {
   // TODO(micafan) Optimize the lock when necessary.
   // Consider avoiding locking in single-threaded processes.
@@ -46,7 +47,8 @@ Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribeAll(
     return Status::OK();
   }
 
-  auto on_subscribe = [this](RedisGcsClient *client, const ID &id,
+  auto on_subscribe = [this](RedisGcsClient *client,
+                             const ID &id,
                              const std::vector<Data> &result) {
     if (result.empty()) {
       return;
@@ -98,7 +100,9 @@ Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribeAll(
 
 template <typename ID, typename Data, typename Table>
 Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribe(
-    const ClientID &client_id, const ID &id, const SubscribeCallback<ID, Data> &subscribe,
+    const ClientID &client_id,
+    const ID &id,
+    const SubscribeCallback<ID, Data> &subscribe,
     const StatusCallback &done) {
   RAY_CHECK(client_id != ClientID::Nil());
 

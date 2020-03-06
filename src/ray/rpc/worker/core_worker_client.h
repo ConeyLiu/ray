@@ -46,8 +46,10 @@ class WorkerAddress {
   }
 
   bool operator==(const WorkerAddress &other) const {
-    return other.ip_address == ip_address && other.port == port &&
-           other.worker_id == worker_id && other.raylet_id == raylet_id;
+    return other.ip_address == ip_address &&
+           other.port == port &&
+           other.worker_id == worker_id &&
+           other.raylet_id == raylet_id;
   }
 
   rpc::Address ToProto() const {
@@ -69,9 +71,8 @@ class WorkerAddress {
   const ClientID raylet_id;
 };
 
-typedef std::function<std::shared_ptr<CoreWorkerClientInterface>(const std::string &,
-                                                                 int)>
-    ClientFactoryFn;
+using ClientFactoryFn =
+        std::function<std::shared_ptr<CoreWorkerClientInterface>(const std::string &, int)>;
 
 /// Abstract client interface for testing.
 class CoreWorkerClientInterface {
@@ -133,20 +134,24 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
   /// \param[in] address Address of the worker server.
   /// \param[in] port Port of the worker server.
   /// \param[in] client_call_manager The `ClientCallManager` used for managing requests.
-  CoreWorkerClient(const std::string &address, const int port,
+  CoreWorkerClient(const std::string &address,
+                   const int port,
                    ClientCallManager &client_call_manager)
       : client_call_manager_(client_call_manager) {
     std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
-        address + ":" + std::to_string(port), grpc::InsecureChannelCredentials());
+        address + ":" + std::to_string(port),
+        grpc::InsecureChannelCredentials());
     stub_ = CoreWorkerService::NewStub(channel);
   };
 
   ray::Status AssignTask(const AssignTaskRequest &request,
                          const ClientCallback<AssignTaskReply> &callback) override {
-    auto call = client_call_manager_
-                    .CreateCall<CoreWorkerService, AssignTaskRequest, AssignTaskReply>(
-                        *stub_, &CoreWorkerService::Stub::PrepareAsyncAssignTask, request,
-                        callback);
+    auto call = client_call_manager_.CreateCall<CoreWorkerService,
+                                                AssignTaskRequest,
+                                                AssignTaskReply>(
+         *stub_, &CoreWorkerService::Stub::PrepareAsyncAssignTask,
+         request,
+         callback);
     return call->GetStatus();
   }
 
@@ -155,11 +160,13 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
     request->set_sequence_number(request->task_spec().actor_task_spec().actor_counter());
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      // this should be the actior id
       if (request->task_spec().caller_id() != cur_caller_id_) {
         // We are running a new task, reset the seq no counter.
         max_finished_seq_no_ = -1;
         cur_caller_id_ = request->task_spec().caller_id();
       }
+      // actor tasks should be ordered
       send_queue_.push_back(std::make_pair(std::move(request), callback));
     }
     SendRequests();
@@ -170,10 +177,14 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
                              const ClientCallback<PushTaskReply> &callback) override {
     request->set_sequence_number(-1);
     request->set_client_processed_up_to(-1);
-    auto call = client_call_manager_
-                    .CreateCall<CoreWorkerService, PushTaskRequest, PushTaskReply>(
-                        *stub_, &CoreWorkerService::Stub::PrepareAsyncPushTask, *request,
-                        callback);
+    // normal tasks don't need be ordered
+    auto call = client_call_manager_.CreateCall<CoreWorkerService,
+                                                PushTaskRequest,
+                                                PushTaskReply>(
+        *stub_,
+        &CoreWorkerService::Stub::PrepareAsyncPushTask,
+        *request,
+        callback);
     return call->GetStatus();
   }
 
@@ -183,17 +194,23 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
     auto call = client_call_manager_.CreateCall<CoreWorkerService,
                                                 DirectActorCallArgWaitCompleteRequest,
                                                 DirectActorCallArgWaitCompleteReply>(
-        *stub_, &CoreWorkerService::Stub::PrepareAsyncDirectActorCallArgWaitComplete,
-        request, callback);
+        *stub_,
+        &CoreWorkerService::Stub::PrepareAsyncDirectActorCallArgWaitComplete,
+        request,
+        callback);
     return call->GetStatus();
   }
 
   virtual ray::Status GetObjectStatus(
       const GetObjectStatusRequest &request,
       const ClientCallback<GetObjectStatusReply> &callback) override {
-    auto call = client_call_manager_.CreateCall<CoreWorkerService, GetObjectStatusRequest,
+    auto call = client_call_manager_.CreateCall<CoreWorkerService,
+                                                GetObjectStatusRequest,
                                                 GetObjectStatusReply>(
-        *stub_, &CoreWorkerService::Stub::PrepareAsyncGetObjectStatus, request, callback);
+        *stub_,
+        &CoreWorkerService::Stub::PrepareAsyncGetObjectStatus,
+        request,
+        callback);
     return call->GetStatus();
   }
 
@@ -217,21 +234,26 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
       request->set_client_processed_up_to(max_finished_seq_no_);
       rpc_bytes_in_flight_ += task_size;
 
-      client_call_manager_.CreateCall<CoreWorkerService, PushTaskRequest, PushTaskReply>(
-          *stub_, &CoreWorkerService::Stub::PrepareAsyncPushTask, *request,
-          [this, this_ptr, seq_no, task_size, callback](Status status,
-                                                        const rpc::PushTaskReply &reply) {
-            {
+      auto wrappedCallback = [this, this_ptr, seq_no, task_size, callback](
+              Status status,
+              const rpc::PushTaskReply &reply) {
+          {
               std::lock_guard<std::mutex> lock(mutex_);
               if (seq_no > max_finished_seq_no_) {
-                max_finished_seq_no_ = seq_no;
+                  max_finished_seq_no_ = seq_no;
               }
               rpc_bytes_in_flight_ -= task_size;
               RAY_CHECK(rpc_bytes_in_flight_ >= 0);
-            }
-            SendRequests();
-            callback(status, reply);
-          });
+          }
+          SendRequests();
+          callback(status, reply);
+      };
+
+      client_call_manager_.CreateCall<CoreWorkerService, PushTaskRequest, PushTaskReply>(
+          *stub_,
+          &CoreWorkerService::Stub::PrepareAsyncPushTask,
+          *request,
+          wrappedCallback);
     }
 
     if (!send_queue_.empty()) {

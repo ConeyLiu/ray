@@ -61,31 +61,51 @@ class NodeManagerGrpcService : public GrpcService {
           *server_call_factories_and_concurrencies) override {
     // Initialize the factory for requests.
     std::unique_ptr<ServerCallFactory> request_worker_lease_call_factory(
-        new ServerCallFactoryImpl<NodeManagerService, NodeManagerServiceHandler,
-                                  WorkerLeaseRequest, WorkerLeaseReply>(
-            service_, &NodeManagerService::AsyncService::RequestRequestWorkerLease,
-            service_handler_, &NodeManagerServiceHandler::HandleWorkerLeaseRequest, cq,
+        new ServerCallFactoryImpl<NodeManagerService,
+                                     NodeManagerServiceHandler,
+                                     WorkerLeaseRequest,
+                                     WorkerLeaseReply>(
+            service_,
+            &NodeManagerService::AsyncService::RequestRequestWorkerLease,
+            service_handler_,
+            &NodeManagerServiceHandler::HandleWorkerLeaseRequest,
+            cq,
             main_service_));
 
     std::unique_ptr<ServerCallFactory> release_worker_call_factory(
-        new ServerCallFactoryImpl<NodeManagerService, NodeManagerServiceHandler,
-                                  ReturnWorkerRequest, ReturnWorkerReply>(
-            service_, &NodeManagerService::AsyncService::RequestReturnWorker,
-            service_handler_, &NodeManagerServiceHandler::HandleReturnWorker, cq,
+        new ServerCallFactoryImpl<NodeManagerService,
+                                     NodeManagerServiceHandler,
+                                     ReturnWorkerRequest,
+                                     ReturnWorkerReply>(
+            service_,
+            &NodeManagerService::AsyncService::RequestReturnWorker,
+            service_handler_,
+            &NodeManagerServiceHandler::HandleReturnWorker,
+            cq,
             main_service_));
 
     std::unique_ptr<ServerCallFactory> forward_task_call_factory(
-        new ServerCallFactoryImpl<NodeManagerService, NodeManagerServiceHandler,
-                                  ForwardTaskRequest, ForwardTaskReply>(
-            service_, &NodeManagerService::AsyncService::RequestForwardTask,
-            service_handler_, &NodeManagerServiceHandler::HandleForwardTask, cq,
+        new ServerCallFactoryImpl<NodeManagerService,
+                                     NodeManagerServiceHandler,
+                                     ForwardTaskRequest,
+                                     ForwardTaskReply>(
+            service_,
+            &NodeManagerService::AsyncService::RequestForwardTask,
+            service_handler_,
+            &NodeManagerServiceHandler::HandleForwardTask,
+            cq,
             main_service_));
 
     std::unique_ptr<ServerCallFactory> node_stats_call_factory(
-        new ServerCallFactoryImpl<NodeManagerService, NodeManagerServiceHandler,
-                                  NodeStatsRequest, NodeStatsReply>(
-            service_, &NodeManagerService::AsyncService::RequestGetNodeStats,
-            service_handler_, &NodeManagerServiceHandler::HandleNodeStatsRequest, cq,
+        new ServerCallFactoryImpl<NodeManagerService,
+                                     NodeManagerServiceHandler,
+                                     NodeStatsRequest,
+                                     NodeStatsReply>(
+            service_,
+            &NodeManagerService::AsyncService::RequestGetNodeStats,
+            service_handler_,
+            &NodeManagerServiceHandler::HandleNodeStatsRequest,
+            cq,
             main_service_));
 
     // Set accept concurrency.

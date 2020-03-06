@@ -23,9 +23,9 @@ namespace {
 /// the task's counter is equal to the returned value, then the task should be
 /// the next to run.
 int64_t GetExpectedTaskCounter(
-    const std::unordered_map<ray::ActorID, ray::raylet::ActorRegistration>
-        &actor_registry,
-    const ray::ActorID &actor_id, const ray::TaskID &actor_caller_id) {
+    const std::unordered_map<ray::ActorID, ray::raylet::ActorRegistration> &actor_registry,
+    const ray::ActorID &actor_id,
+    const ray::TaskID &actor_caller_id) {
   auto actor_entry = actor_registry.find(actor_id);
   RAY_CHECK(actor_entry != actor_registry.end());
   const auto &frontier = actor_entry->second.GetFrontier();
@@ -86,8 +86,10 @@ NodeManager::NodeManager(boost::asio::io_service &io_service,
       object_manager_profile_timer_(io_service),
       initial_config_(config),
       local_available_resources_(config.resource_config),
-      worker_pool_(config.num_initial_workers, config.maximum_startup_concurrency,
-                   gcs_client_, config.worker_commands),
+      worker_pool_(config.num_initial_workers,
+                   config.maximum_startup_concurrency,
+                   gcs_client_,
+                   config.worker_commands),
       scheduling_policy_(local_queues_),
       reconstruction_policy_(
           io_service_,
@@ -95,15 +97,20 @@ NodeManager::NodeManager(boost::asio::io_service &io_service,
             HandleTaskReconstruction(task_id, required_object_id);
           },
           RayConfig::instance().initial_reconstruction_timeout_milliseconds(),
-          gcs_client_->client_table().GetLocalClientId(), gcs_client_->task_lease_table(),
-          object_directory_, gcs_client_->task_reconstruction_log()),
+          gcs_client_->client_table().GetLocalClientId(),
+          gcs_client_->task_lease_table(),
+          object_directory_,
+          gcs_client_->task_reconstruction_log()),
       task_dependency_manager_(
-          object_manager, reconstruction_policy_, io_service,
+          object_manager,
+          reconstruction_policy_,
+          io_service,
           gcs_client_->client_table().GetLocalClientId(),
           RayConfig::instance().initial_reconstruction_timeout_milliseconds(),
           gcs_client_->task_lease_table()),
       lineage_cache_(gcs_client_->client_table().GetLocalClientId(),
-                     gcs_client_->raylet_task_table(), gcs_client_->raylet_task_table(),
+                     gcs_client_->raylet_task_table(),
+                     gcs_client_->raylet_task_table(),
                      config.max_lineage_size),
       actor_registry_(),
       node_manager_server_("NodeManager", config.node_manager_port),
@@ -186,28 +193,30 @@ ray::Status NodeManager::RegisterGcs() {
       gcs_client_->Actors().AsyncSubscribeAll(actor_notification_callback, nullptr));
 
   // Register a callback on the client table for new clients.
-  auto node_manager_client_added = [this](gcs::RedisGcsClient *client, const UniqueID &id,
-                                          const GcsNodeInfo &data) { ClientAdded(data); };
+  auto node_manager_client_added = [this](gcs::RedisGcsClient *client,
+                                          const UniqueID &id,
+                                          const GcsNodeInfo &data) {
+      ClientAdded(data);
+  };
   gcs_client_->client_table().RegisterClientAddedCallback(node_manager_client_added);
   // Register a callback on the client table for removed clients.
   auto node_manager_client_removed = [this](gcs::RedisGcsClient *client,
-                                            const UniqueID &id, const GcsNodeInfo &data) {
+                                            const UniqueID &id,
+                                            const GcsNodeInfo &data) {
     ClientRemoved(data);
   };
   gcs_client_->client_table().RegisterClientRemovedCallback(node_manager_client_removed);
 
   // Subscribe to resource changes.
   const auto &resources_changed =
-      [this](
-          gcs::RedisGcsClient *client, const ClientID &id,
-          const gcs::GcsChangeMode change_mode,
-          const std::unordered_map<std::string, std::shared_ptr<gcs::ResourceTableData>>
-              &data) {
+      [this](gcs::RedisGcsClient *client,
+             const ClientID &id,
+             const gcs::GcsChangeMode change_mode,
+             const std::unordered_map<std::string, std::shared_ptr<gcs::ResourceTableData>> &data) {
         if (change_mode == gcs::GcsChangeMode::APPEND_OR_ADD) {
           ResourceSet resource_set;
           for (auto &entry : data) {
-            resource_set.AddOrUpdateResource(entry.first,
-                                             entry.second->resource_capacity());
+            resource_set.AddOrUpdateResource(entry.first, entry.second->resource_capacity());
           }
           ResourceCreateUpdated(id, resource_set);
         }
@@ -226,7 +235,8 @@ ray::Status NodeManager::RegisterGcs() {
 
   // Subscribe to heartbeat batches from the monitor.
   const auto &heartbeat_batch_added =
-      [this](gcs::RedisGcsClient *client, const ClientID &id,
+      [this](gcs::RedisGcsClient *client,
+             const ClientID &id,
              const HeartbeatBatchTableData &heartbeat_batch) {
         HeartbeatBatchAdded(heartbeat_batch);
       };
@@ -317,8 +327,7 @@ void NodeManager::Heartbeat() {
   heartbeat_data->set_client_id(my_client_id.Binary());
   // TODO(atumanov): modify the heartbeat table protocol to use the ResourceSet directly.
   // TODO(atumanov): implement a ResourceSet const_iterator.
-  for (const auto &resource_pair :
-       local_resources.GetAvailableResources().GetResourceMap()) {
+  for (const auto &resource_pair : local_resources.GetAvailableResources().GetResourceMap()) {
     heartbeat_data->add_resources_available_label(resource_pair.first);
     heartbeat_data->add_resources_available_capacity(resource_pair.second);
   }
@@ -345,8 +354,7 @@ void NodeManager::Heartbeat() {
     // TODO(edoakes): we might want to improve the sampling technique here, for example
     // preferring object IDs with the earliest last-refreshed timestamp.
     std::vector<ObjectID> downsampled;
-    random_sample(active_object_ids.begin(), active_object_ids.end(), max_size,
-                  &downsampled);
+    random_sample(active_object_ids.begin(), active_object_ids.end(), max_size, &downsampled);
     for (const auto &object_id : downsampled) {
       heartbeat_data->add_active_object_id(object_id.Binary());
     }
@@ -487,13 +495,15 @@ void NodeManager::ClientAdded(const GcsNodeInfo &node_info) {
   // Initialize a rpc client to the new node manager.
   std::unique_ptr<rpc::NodeManagerClient> client(
       new rpc::NodeManagerClient(node_info.node_manager_address(),
-                                 node_info.node_manager_port(), client_call_manager_));
+                                    node_info.node_manager_port(),
+                                    client_call_manager_));
   remote_node_manager_clients_.emplace(client_id, std::move(client));
 
   // Fetch resource info for the remote client and update cluster resource map.
   RAY_CHECK_OK(gcs_client_->resource_table().Lookup(
       JobID::Nil(), client_id,
-      [this](gcs::RedisGcsClient *client, const ClientID &client_id,
+      [this](gcs::RedisGcsClient *client,
+             const ClientID &client_id,
              const std::unordered_map<std::string,
                                       std::shared_ptr<gcs::ResourceTableData>> &pairs) {
         ResourceSet resource_set;
@@ -583,7 +593,8 @@ void NodeManager::ResourceCreateUpdated(const ClientID &client_id,
                                                      new_resource_capacity);
     }
     if (new_scheduler_enabled_) {
-      new_resource_scheduler_->UpdateResourceCapacity(client_id.Binary(), resource_label,
+      new_resource_scheduler_->UpdateResourceCapacity(client_id.Binary(),
+                                                      resource_label,
                                                       new_resource_capacity);
     }
   }
@@ -829,6 +840,7 @@ void NodeManager::ProcessNewClient(LocalClientConnection &client) {
 
 // A helper function to create a mapping from task scheduling class to
 // tasks with that class from a given list of tasks.
+// SchedulingClass is actually a pair of task request resources and task description
 std::unordered_map<SchedulingClass, ordered_set<TaskID>> MakeTasksByClass(
     const std::vector<Task> &tasks) {
   std::unordered_map<SchedulingClass, ordered_set<TaskID>> result;
@@ -852,18 +864,17 @@ void NodeManager::DispatchTasks(
   // sort once per round of task dispatch, which is less fair then it could be, but
   // is simpler and faster.
   if (fair_queueing_enabled_) {
-    std::sort(
-        std::begin(fair_order), std::end(fair_order),
+    std::sort(std::begin(fair_order),
+              std::end(fair_order),
         [this](const std::pair<const SchedulingClass, ordered_set<ray::TaskID>> *a,
-               const std::pair<const SchedulingClass, ordered_set<ray::TaskID>> *b) {
+                     const std::pair<const SchedulingClass, ordered_set<ray::TaskID>> *b) {
           return local_queues_.NumRunning(a->first) < local_queues_.NumRunning(b->first);
         });
   }
   std::vector<std::function<void()>> post_assign_callbacks;
   // Approximate fair round robin between classes.
   for (const auto &it : fair_order) {
-    const auto &task_resources =
-        TaskSpecification::GetSchedulingClassDescriptor(it->first).first;
+    const auto &task_resources = TaskSpecification::GetSchedulingClassDescriptor(it->first).first;
     // FIFO order within each class.
     for (const auto &task_id : it->second) {
       const auto &task = local_queues_.GetTaskOfState(task_id, TaskState::READY);
@@ -875,8 +886,7 @@ void NodeManager::DispatchTasks(
 
       // Try to get an idle worker to execute this task. If nullptr, there
       // aren't any available workers so we can't assign the task.
-      std::shared_ptr<Worker> worker =
-          worker_pool_.PopWorker(task.GetTaskSpecification());
+      std::shared_ptr<Worker> worker = worker_pool_.PopWorker(task.GetTaskSpecification());
       if (worker != nullptr) {
         AssignTask(worker, task, &post_assign_callbacks);
       }
@@ -1910,7 +1920,8 @@ void NodeManager::TreatTaskAsFailedIfLost(const Task &task) {
   }
 }
 
-void NodeManager::SubmitTask(const Task &task, const Lineage &uncommitted_lineage,
+void NodeManager::SubmitTask(const Task &task,
+                             const Lineage &uncommitted_lineage,
                              bool forwarded) {
   stats::TaskCountReceived().Record(1);
   const TaskSpecification &spec = task.GetTaskSpecification();
@@ -2220,6 +2231,8 @@ void NodeManager::EnqueuePlaceableTask(const Task &task) {
   // (See design_docs/task_states.rst for the state transition diagram.)
   if (args_ready) {
     local_queues_.QueueTasks({task}, TaskState::READY);
+    // MakeTasksByClass returns mapping between:
+    //   pair(task request resources to task descriptions) -> set(task ids)
     DispatchTasks(MakeTasksByClass({task}));
   } else {
     local_queues_.QueueTasks({task}, TaskState::WAITING);
@@ -2230,7 +2243,8 @@ void NodeManager::EnqueuePlaceableTask(const Task &task) {
   task_dependency_manager_.TaskPending(task);
 }
 
-void NodeManager::AssignTask(const std::shared_ptr<Worker> &worker, const Task &task,
+void NodeManager::AssignTask(const std::shared_ptr<Worker> &worker,
+                             const Task &task,
                              std::vector<std::function<void()>> *post_assign_callbacks) {
   const TaskSpecification &spec = task.GetTaskSpecification();
   RAY_CHECK(post_assign_callbacks);
@@ -2251,8 +2265,7 @@ void NodeManager::AssignTask(const std::shared_ptr<Worker> &worker, const Task &
   flatbuffers::FlatBufferBuilder fbb;
 
   // Resource accounting: acquire resources for the assigned task.
-  auto acquired_resources =
-      local_available_resources_.Acquire(spec.GetRequiredResources());
+  auto acquired_resources = local_available_resources_.Acquire(spec.GetRequiredResources());
   const auto &my_client_id = gcs_client_->client_table().GetLocalClientId();
   cluster_resource_map_[my_client_id].Acquire(spec.GetRequiredResources());
   if (new_scheduler_enabled_) {
@@ -2575,8 +2588,10 @@ void NodeManager::HandleTaskReconstruction(const TaskID &task_id,
   RAY_CHECK_OK(gcs_client_->raylet_task_table().Lookup(
       JobID::Nil(), task_id,
       /*success_callback=*/
-      [this, required_object_id](ray::gcs::RedisGcsClient *client, const TaskID &task_id,
-                                 const TaskTableData &task_data) {
+      [this, required_object_id](
+              ray::gcs::RedisGcsClient *client,
+              const TaskID &task_id,
+              const TaskTableData &task_data) {
         // The task was in the GCS task table. Use the stored task spec to
         // re-execute the task.
         ResubmitTask(Task(task_data.task()), required_object_id);

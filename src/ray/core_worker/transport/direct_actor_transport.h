@@ -72,7 +72,9 @@ class CoreWorkerDirectActorTaskSubmitter {
   /// \return Void.
   void PushActorTask(rpc::CoreWorkerClientInterface &client,
                      std::unique_ptr<rpc::PushTaskRequest> request,
-                     const ActorID &actor_id, const TaskID &task_id, int num_returns)
+                     const ActorID &actor_id,
+                     const TaskID &task_id,
+                     int num_returns)
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   /// Send all pending tasks for an actor.
@@ -135,7 +137,8 @@ class InboundRequest {
  public:
   InboundRequest(){};
   InboundRequest(std::function<void()> accept_callback,
-                 std::function<void()> reject_callback, bool has_dependencies)
+                 std::function<void()> reject_callback,
+                 bool has_dependencies)
       : accept_callback_(accept_callback),
         reject_callback_(reject_callback),
         has_pending_dependencies_(has_dependencies) {}
@@ -282,7 +285,8 @@ class FiberRateLimiter {
 /// See direct_actor.proto for a description of the ordering protocol.
 class SchedulingQueue {
  public:
-  SchedulingQueue(boost::asio::io_service &main_io_service, DependencyWaiter &waiter,
+  SchedulingQueue(boost::asio::io_service &main_io_service,
+                  DependencyWaiter &waiter,
                   std::shared_ptr<BoundedExecutor> pool = nullptr,
                   bool use_asyncio = false,
                   std::shared_ptr<FiberRateLimiter> fiber_rate_limiter = nullptr,
@@ -295,22 +299,26 @@ class SchedulingQueue {
         use_asyncio_(use_asyncio),
         fiber_rate_limiter_(fiber_rate_limiter) {}
 
-  void Add(int64_t seq_no, int64_t client_processed_up_to,
-           std::function<void()> accept_request, std::function<void()> reject_request,
+  void Add(int64_t seq_no,
+           int64_t client_processed_up_to,
+           std::function<void()> accept_request,
+           std::function<void()> reject_request,
            const std::vector<ObjectID> &dependencies = {}) {
     if (seq_no == -1) {
       accept_request();  // A seq_no of -1 means no ordering constraint.
       return;
     }
     RAY_CHECK(boost::this_thread::get_id() == main_thread_id_);
+    // client_processed_up_to + 1 should be next_seq_no_
     if (client_processed_up_to >= next_seq_no_) {
       RAY_LOG(ERROR) << "client skipping requests " << next_seq_no_ << " to "
                      << client_processed_up_to;
       next_seq_no_ = client_processed_up_to + 1;
     }
     RAY_LOG(DEBUG) << "Enqueue " << seq_no << " cur seqno " << next_seq_no_;
-    pending_tasks_[seq_no] =
-        InboundRequest(accept_request, reject_request, dependencies.size() > 0);
+    pending_tasks_[seq_no] = InboundRequest(accept_request,
+                                            reject_request,
+                                           dependencies.size() > 0);
     if (dependencies.size() > 0) {
       waiter_.Wait(dependencies, [seq_no, this]() {
         RAY_CHECK(boost::this_thread::get_id() == main_thread_id_);
@@ -337,7 +345,8 @@ class SchedulingQueue {
     }
 
     // Process as many in-order requests as we can.
-    while (!pending_tasks_.empty() && pending_tasks_.begin()->first == next_seq_no_ &&
+    while (!pending_tasks_.empty() &&
+           pending_tasks_.begin()->first == next_seq_no_ &&
            pending_tasks_.begin()->second.CanExecute()) {
       auto head = pending_tasks_.begin();
       auto request = head->second;
@@ -347,8 +356,7 @@ class SchedulingQueue {
           fiber_rate_limiter_->Acquire();
           request.Accept();
           fiber_rate_limiter_->Release();
-        })
-            .detach();
+        }).detach();
       } else if (pool_ != nullptr) {
         pool_->PostBlocking([request]() mutable { request.Accept(); });
       } else {

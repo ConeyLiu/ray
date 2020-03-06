@@ -31,7 +31,8 @@ class TaskDependencyManager {
   /// Create a task dependency manager.
   TaskDependencyManager(ObjectManagerInterface &object_manager,
                         ReconstructionPolicyInterface &reconstruction_policy,
-                        boost::asio::io_service &io_service, const ClientID &client_id,
+                        boost::asio::io_service &io_service,
+                        const ClientID &client_id,
                         int64_t initial_lease_period_ms,
                         gcs::TableInterface<TaskID, TaskLeaseData> &task_lease_table);
 
@@ -41,7 +42,7 @@ class TaskDependencyManager {
   /// \return Whether the object is local.
   bool CheckObjectLocal(const ObjectID &object_id) const;
 
-  /// Subscribe to object depedencies required by the task and check whether
+  /// Subscribe to object dependencies required by the task and check whether
   /// all dependencies are fulfilled. This should be called for task arguments and
   /// `ray.get` calls during task execution.
   ///
@@ -60,7 +61,7 @@ class TaskDependencyManager {
   bool SubscribeGetDependencies(const TaskID &task_id,
                                 const std::vector<ObjectID> &required_objects);
 
-  /// Subscribe to object depedencies required by the worker. This should be called for
+  /// Subscribe to object dependencies required by the worker. This should be called for
   /// ray.wait calls during task execution.
   ///
   /// The TaskDependencyManager will track all remote dependencies until the
@@ -237,8 +238,7 @@ class TaskDependencyManager {
   /// mapping from task ID to information about the objects that the task
   /// creates, either by return value or by `ray.put`. For each object, we
   /// store the IDs of the subscribed tasks that are dependent on the object.
-  std::unordered_map<ray::TaskID, std::unordered_map<ObjectID, ObjectDependencies>>
-      required_tasks_;
+  std::unordered_map<ray::TaskID, std::unordered_map<ObjectID, ObjectDependencies>> required_tasks_;
   /// Objects that are required by a subscribed task, are not local, and are
   /// not created by a pending task. For these objects, there are pending
   /// operations to make the object available.

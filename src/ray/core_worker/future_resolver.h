@@ -27,7 +27,8 @@ class FutureResolver {
   /// \param[in] owner_id The ID of the task or actor that owns the future.
   /// \param[in] owner_address The address of the task or actor that owns the
   /// future.
-  void ResolveFutureAsync(const ObjectID &object_id, const TaskID &owner_id,
+  void ResolveFutureAsync(const ObjectID &object_id,
+                          const TaskID &owner_id,
                           const rpc::Address &owner_address);
 
  private:

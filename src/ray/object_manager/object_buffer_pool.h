@@ -24,7 +24,9 @@ class ObjectBufferPool {
   /// This is the structure returned whenever an object chunk is
   /// accessed via Get and Create.
   struct ChunkInfo {
-    ChunkInfo(uint64_t chunk_index, uint8_t *data, uint64_t buffer_length)
+    ChunkInfo(uint64_t chunk_index,
+              uint8_t *data,
+              uint64_t buffer_length)
         : chunk_index(chunk_index), data(data), buffer_length(buffer_length){};
     /// A pointer to the start position of this object chunk.
     uint64_t chunk_index;
@@ -70,7 +72,9 @@ class ObjectBufferPool {
   /// \return A pair consisting of a ChunkInfo and status of invoking this method.
   /// An IOError status is returned if the Get call on the plasma store fails.
   std::pair<const ObjectBufferPool::ChunkInfo &, ray::Status> GetChunk(
-      const ObjectID &object_id, uint64_t data_size, uint64_t metadata_size,
+      const ObjectID &object_id,
+      uint64_t data_size,
+      uint64_t metadata_size,
       uint64_t chunk_index);
 
   /// When a chunk is done being used as part of a get, this method releases the chunk.
@@ -97,7 +101,9 @@ class ObjectBufferPool {
   /// or if create is invoked consecutively on the same chunk
   /// (with no intermediate AbortCreateChunk).
   std::pair<const ObjectBufferPool::ChunkInfo &, ray::Status> CreateChunk(
-      const ObjectID &object_id, uint64_t data_size, uint64_t metadata_size,
+      const ObjectID &object_id,
+      uint64_t data_size,
+      uint64_t metadata_size,
       uint64_t chunk_index);
 
   /// Abort the create operation associated with a chunk at chunk_index.
@@ -140,7 +146,8 @@ class ObjectBufferPool {
 
   /// Splits an object into ceil(data_size/chunk_size) chunks, which will
   /// either be read or written to in parallel.
-  std::vector<ChunkInfo> BuildChunks(const ObjectID &object_id, uint8_t *data,
+  std::vector<ChunkInfo> BuildChunks(const ObjectID &object_id,
+                                     uint8_t *data,
                                      uint64_t data_size);
 
   /// Holds the state of a get buffer.

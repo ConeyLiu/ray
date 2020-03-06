@@ -59,6 +59,8 @@ extern RedisChainModule module;
 namespace internal_redis_commands {
 
 /// Map from pub sub channel to clients that are waiting on that channel.
+/// Key is pubsub_channel:id
+/// Value is pubsub_channel:client_id
 std::unordered_map<std::string, std::vector<std::string>> notification_map;
 
 /// Parse a Redis string into a TablePubsub channel.
@@ -197,8 +199,10 @@ inline void CreateGcsEntry(RedisModuleString *id, GcsChangeMode change_mode,
 /// \param id The ID of the key that the notification is about.
 /// \param data_buffer The data to publish, which is a GcsEntry buffer.
 /// \return OK if there is no error during a publish.
-int PublishDataHelper(RedisModuleCtx *ctx, RedisModuleString *pubsub_channel_str,
-                      RedisModuleString *id, RedisModuleString *data_buffer) {
+int PublishDataHelper(RedisModuleCtx *ctx,
+                      RedisModuleString *pubsub_channel_str,
+                      RedisModuleString *id,
+                      RedisModuleString *data_buffer) {
   // Write the data back to any subscribers that are listening to all table
   // notifications.
   RedisModuleCallReply *reply =
@@ -240,8 +244,10 @@ int PublishDataHelper(RedisModuleCtx *ctx, RedisModuleString *pubsub_channel_str
 /// \param mode the update mode, such as append or remove.
 /// \param data The appended/removed data.
 /// \return OK if there is no error during a publish.
-int PublishTableUpdate(RedisModuleCtx *ctx, RedisModuleString *pubsub_channel_str,
-                       RedisModuleString *id, GcsChangeMode change_mode,
+int PublishTableUpdate(RedisModuleCtx *ctx,
+                       RedisModuleString *pubsub_channel_str,
+                       RedisModuleString *id,
+                       GcsChangeMode change_mode,
                        RedisModuleString *data) {
   // Serialize the notification to send.
   GcsEntry gcs_entry;
@@ -256,6 +262,7 @@ int PublishTableUpdate(RedisModuleCtx *ctx, RedisModuleString *pubsub_channel_st
 //   (helper) TableAdd_DoWrite: performs the write to redis state.
 //   (helper) TableAdd_DoPublish: performs a publish after the write.
 //   ChainTableAdd_RedisCommand: the same command, chain-enabled.
+// RAY.TABLE_ADD prefix_str pubsub_channel_str id data
 
 int TableAdd_DoWrite(RedisModuleCtx *ctx, RedisModuleString **argv, int argc,
                      RedisModuleString **mutated_key_str) {
@@ -286,7 +293,10 @@ int TableAdd_DoPublish(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
 
   if (pubsub_channel != TablePubsub::NO_PUBLISH) {
     // All other pubsub channels write the data back directly onto the channel.
-    return PublishTableUpdate(ctx, pubsub_channel_str, id, GcsChangeMode::APPEND_OR_ADD,
+    return PublishTableUpdate(ctx,
+                              pubsub_channel_str,
+                              id,
+                              GcsChangeMode::APPEND_OR_ADD,
                               data);
   } else {
     return RedisModule_ReplyWithSimpleString(ctx, "OK");
@@ -826,8 +836,12 @@ int TableDelete_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int 
 /// values at the key. Notifications will be sent to the requesting client for
 /// every subsequent TABLE_ADD to the key.
 ///
+///
+///  pubsub_channel:client_id listen on table_prefix:id
+///
+///
 /// This is called from a client with the command:
-//
+///
 ///    RAY.TABLE_REQUEST_NOTIFICATIONS <table_prefix> <pubsub_channel> <id>
 ///        <client_id>
 ///
@@ -849,19 +863,19 @@ int TableRequestNotifications_RedisCommand(RedisModuleCtx *ctx, RedisModuleStrin
   RedisModuleString *pubsub_channel_str = argv[2];
   RedisModuleString *id = argv[3];
   RedisModuleString *client_id = argv[4];
-  RedisModuleString *client_channel;
+  RedisModuleString *client_channel; // channel_str + client_id
   REPLY_AND_RETURN_IF_NOT_OK(
       FormatPubsubChannel(&client_channel, ctx, pubsub_channel_str, client_id));
 
   // Add this client to the set of clients that should be notified when there
   // are changes to the key.
-  std::string notification_key;
+  std::string notification_key;  // channel_str + id
   REPLY_AND_RETURN_IF_NOT_OK(
       GetBroadcastKey(ctx, pubsub_channel_str, id, &notification_key));
   notification_map[notification_key].push_back(RedisString_ToString(client_channel));
 
   // Lookup the current value at the key.
-  RedisModuleKey *table_key;
+  RedisModuleKey *table_key;  // prefix + id
   REPLY_AND_RETURN_IF_NOT_OK(
       OpenPrefixedKey(&table_key, ctx, prefix_str, id, REDISMODULE_READ));
   // Publish the current value at the key to the client that is requesting

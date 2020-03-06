@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+import os
 from types import FunctionType
 
 from ray.rllib.utils.annotations import DeveloperAPI
@@ -134,8 +135,13 @@ class WorkerSet(object):
 
     def _make_worker(self, cls, env_creator, policy, worker_index, config):
         def session_creator():
-            logger.debug("Creating TF session {}".format(
-                config["tf_session_args"]))
+            if ('tf_session_args' in config and
+                    'intra_op_parallelism_threads' in config['tf_session_args']):
+                omp_num_threads = int(config['tf_session_args']['intra_op_parallelism_threads'])
+                os.environ['OMP_NUM_THREADS'] = omp_num_threads
+                logger.info(f"Setting OMP_NUM_THREADS to {omp_num_threads}")
+
+            logger.debug("Creating TF session {}".format(config["tf_session_args"]))
             return tf.Session(
                 config=tf.ConfigProto(**config["tf_session_args"]))
 
@@ -188,8 +194,7 @@ class WorkerSet(object):
             policy,
             policy_mapping_fn=config["multiagent"]["policy_mapping_fn"],
             policies_to_train=config["multiagent"]["policies_to_train"],
-            tf_session_creator=(session_creator
-                                if config["tf_session_args"] else None),
+            tf_session_creator=(session_creator if config["tf_session_args"] else None),
             batch_steps=config["sample_batch_size"],
             batch_mode=config["batch_mode"],
             episode_horizon=config["horizon"],

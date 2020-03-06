@@ -113,6 +113,5 @@ if __name__ == "__main__":
         spawn_reaper=False,
         connect_only=True)
     ray.worker._global_node = node
-    ray.worker.connect(
-        node, mode=ray.WORKER_MODE, internal_config=internal_config)
+    ray.worker.connect(node, mode=ray.WORKER_MODE, internal_config=internal_config)
     ray.worker.global_worker.main_loop()

@@ -41,8 +41,7 @@ class ObjectDirectoryInterface {
   /// should be pre-populated with the requested client ID. If the directory
   /// has information about the requested client, then the rest of the fields
   /// in this struct will be populated accordingly.
-  virtual void LookupRemoteConnectionInfo(
-      RemoteConnectionInfo &connection_info) const = 0;
+  virtual void LookupRemoteConnectionInfo(RemoteConnectionInfo &connection_info) const = 0;
 
   /// Get information for all connected remote object managers.
   ///
@@ -158,10 +157,12 @@ class ObjectDirectory : public ObjectDirectoryInterface {
                                          const ObjectID &object_id) override;
 
   ray::Status ReportObjectAdded(
-      const ObjectID &object_id, const ClientID &client_id,
+      const ObjectID &object_id,
+      const ClientID &client_id,
       const object_manager::protocol::ObjectInfoT &object_info) override;
   ray::Status ReportObjectRemoved(
-      const ObjectID &object_id, const ClientID &client_id,
+      const ObjectID &object_id,
+      const ClientID &client_id,
       const object_manager::protocol::ObjectInfoT &object_info) override;
 
   ray::ClientID GetLocalClientID() override;

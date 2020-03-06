@@ -18,7 +18,7 @@ class LocalDependencyResolver {
   /// Resolve all local and remote dependencies for the task, calling the specified
   /// callback when done. Direct call ids in the task specification will be resolved
   /// to concrete values and inlined.
-  //
+  ///
   /// Note: This method **will mutate** the given TaskSpecification.
   ///
   /// Postcondition: all direct call ids in arguments are converted to values and all

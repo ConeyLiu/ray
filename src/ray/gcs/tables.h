@@ -56,10 +56,13 @@ enum class CommandType { kRegular, kChain, kUnknown };
 template <typename ID>
 class PubsubInterface {
  public:
-  virtual Status RequestNotifications(const JobID &job_id, const ID &id,
+  virtual Status RequestNotifications(const JobID &job_id,
+                                      const ID &id,
                                       const ClientID &client_id,
                                       const StatusCallback &done) = 0;
-  virtual Status CancelNotifications(const JobID &job_id, const ID &id,
+
+  virtual Status CancelNotifications(const JobID &job_id,
+                                     const ID &id,
                                      const ClientID &client_id,
                                      const StatusCallback &done) = 0;
   virtual ~PubsubInterface(){};
@@ -68,13 +71,20 @@ class PubsubInterface {
 template <typename ID, typename Data>
 class LogInterface {
  public:
-  using WriteCallback =
-      std::function<void(RedisGcsClient *client, const ID &id, const Data &data)>;
-  virtual Status Append(const JobID &job_id, const ID &id,
-                        const std::shared_ptr<Data> &data, const WriteCallback &done) = 0;
-  virtual Status AppendAt(const JobID &job_id, const ID &task_id,
-                          const std::shared_ptr<Data> &data, const WriteCallback &done,
-                          const WriteCallback &failure, int log_length) = 0;
+  using WriteCallback = std::function<void(RedisGcsClient *client, const ID &id, const Data &data)>;
+
+  virtual Status Append(const JobID &job_id,
+                        const ID &id,
+                        const std::shared_ptr<Data> &data,
+                        const WriteCallback &done) = 0;
+
+  virtual Status AppendAt(const JobID &job_id,
+                          const ID &task_id,
+                          const std::shared_ptr<Data> &data,
+                          const WriteCallback &done,
+                          const WriteCallback &failure,
+                          int log_length) = 0;
+
   virtual ~LogInterface(){};
 };
 
@@ -91,11 +101,15 @@ class LogInterface {
 template <typename ID, typename Data>
 class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
  public:
-  using Callback = std::function<void(RedisGcsClient *client, const ID &id,
+  using Callback = std::function<void(RedisGcsClient *client,
+                                      const ID &id,
                                       const std::vector<Data> &data)>;
-  using NotificationCallback =
-      std::function<void(RedisGcsClient *client, const ID &id,
-                         const GcsChangeMode change_mode, const std::vector<Data> &data)>;
+
+  using NotificationCallback = std::function<void(RedisGcsClient *client,
+                                                  const ID &id,
+                                                  const GcsChangeMode change_mode,
+                                                  const std::vector<Data> &data)>;
+
   /// The callback to call when a write to a key succeeds.
   using WriteCallback = typename LogInterface<ID, Data>::WriteCallback;
   /// The callback to call when a SUBSCRIBE call completes and we are ready to
@@ -129,7 +143,9 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   /// \param done Callback that is called once the data has been written to the
   /// GCS.
   /// \return Status
-  Status Append(const JobID &job_id, const ID &id, const std::shared_ptr<Data> &data,
+  Status Append(const JobID &job_id,
+                const ID &id,
+                const std::shared_ptr<Data> &data,
                 const WriteCallback &done);
 
   /// Append a log entry to a key if and only if the log has the given number
@@ -144,8 +160,11 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   /// \param log_length The number of entries that the log must have for the
   /// append to succeed.
   /// \return Status
-  Status AppendAt(const JobID &job_id, const ID &id, const std::shared_ptr<Data> &data,
-                  const WriteCallback &done, const WriteCallback &failure,
+  Status AppendAt(const JobID &job_id,
+                  const ID &id,
+                  const std::shared_ptr<Data> &data,
+                  const WriteCallback &done,
+                  const WriteCallback &failure,
                   int log_length);
 
   /// Lookup the log values at a key asynchronously.
@@ -170,8 +189,10 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   /// \param done Callback that is called when subscription is complete and we
   /// are ready to receive messages.
   /// \return Status
-  Status Subscribe(const JobID &job_id, const ClientID &client_id,
-                   const Callback &subscribe, const SubscriptionCallback &done);
+  Status Subscribe(const JobID &job_id,
+                   const ClientID &client_id,
+                   const Callback &subscribe,
+                   const SubscriptionCallback &done);
 
   /// Request notifications about a key in this table.
   ///
@@ -184,13 +205,15 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   ///
   /// \param job_id The ID of the job.
   /// \param id The ID of the key to request notifications for.
-  /// \param client_id The client who is requesting notifications. Before
+  /// \param client_id The client who is requesting notifications.
   /// \param done Callback that is called when request notifications is complete.
   /// notifications can be requested, a call to `Subscribe` to this
   /// table with the same `client_id` must complete successfully.
   /// \return Status
-  Status RequestNotifications(const JobID &job_id, const ID &id,
-                              const ClientID &client_id, const StatusCallback &done);
+  Status RequestNotifications(const JobID &job_id,
+                              const ID &id,
+                              const ClientID &client_id,
+                              const StatusCallback &done);
 
   /// Cancel notifications about a key in this table.
   ///
@@ -199,7 +222,9 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   /// \param client_id The client who originally requested notifications.
   /// \param done Callback that is called when cancel notifications is complete.
   /// \return Status
-  Status CancelNotifications(const JobID &job_id, const ID &id, const ClientID &client_id,
+  Status CancelNotifications(const JobID &job_id,
+                             const ID &id,
+                             const ClientID &client_id,
                              const StatusCallback &done);
 
   /// Delete an entire key from redis.
@@ -210,6 +235,8 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   void Delete(const JobID &job_id, const ID &id);
 
   /// Delete several keys from redis.
+  ///
+  /// Delete log data will not trigger publish event
   ///
   /// \param job_id The ID of the job.
   /// \param ids The vector of IDs to delete from the GCS.
@@ -245,7 +272,8 @@ class Log : public LogInterface<ID, Data>, virtual public PubsubInterface<ID> {
   /// \param done Callback that is called when subscription is complete and we
   /// are ready to receive messages.
   /// \return Status
-  Status Subscribe(const JobID &job_id, const ClientID &client_id,
+  Status Subscribe(const JobID &job_id,
+                   const ClientID &client_id,
                    const NotificationCallback &subscribe,
                    const SubscriptionCallback &done);
 
@@ -277,8 +305,12 @@ template <typename ID, typename Data>
 class TableInterface {
  public:
   using WriteCallback = typename Log<ID, Data>::WriteCallback;
-  virtual Status Add(const JobID &job_id, const ID &task_id,
-                     const std::shared_ptr<Data> &data, const WriteCallback &done) = 0;
+
+  virtual Status Add(const JobID &job_id,
+                     const ID &task_id,
+                     const std::shared_ptr<Data> &data,
+                     const WriteCallback &done) = 0;
+
   virtual ~TableInterface(){};
 };
 
@@ -296,8 +328,7 @@ class Table : private Log<ID, Data>,
               public TableInterface<ID, Data>,
               virtual public PubsubInterface<ID> {
  public:
-  using Callback =
-      std::function<void(RedisGcsClient *client, const ID &id, const Data &data)>;
+  using Callback = std::function<void(RedisGcsClient *client, const ID &id, const Data &data)>;
   using WriteCallback = typename Log<ID, Data>::WriteCallback;
   /// The callback to call when a Lookup call returns an empty entry.
   using FailureCallback = std::function<void(RedisGcsClient *client, const ID &id)>;
@@ -320,7 +351,9 @@ class Table : private Log<ID, Data>,
   /// \param done Callback that is called once the data has been written to the
   /// GCS.
   /// \return Status
-  Status Add(const JobID &job_id, const ID &id, const std::shared_ptr<Data> &data,
+  Status Add(const JobID &job_id,
+             const ID &id,
+             const std::shared_ptr<Data> &data,
              const WriteCallback &done);
 
   /// Lookup an entry asynchronously.
@@ -332,7 +365,9 @@ class Table : private Log<ID, Data>,
   /// \param failure Callback that is called after lookup if there was no data
   /// at the key.
   /// \return Status
-  Status Lookup(const JobID &job_id, const ID &id, const Callback &lookup,
+  Status Lookup(const JobID &job_id,
+                const ID &id,
+                const Callback &lookup,
                 const FailureCallback &failure);
 
   /// Subscribe to any Add operations to this table. The caller may choose to
@@ -352,8 +387,10 @@ class Table : private Log<ID, Data>,
   /// \param done Callback that is called when subscription is complete and we
   /// are ready to receive messages.
   /// \return Status
-  Status Subscribe(const JobID &job_id, const ClientID &client_id,
-                   const Callback &subscribe, const FailureCallback &failure,
+  Status Subscribe(const JobID &job_id,
+                   const ClientID &client_id,
+                   const Callback &subscribe,
+                   const FailureCallback &failure,
                    const SubscriptionCallback &done);
 
   void Delete(const JobID &job_id, const ID &id) { Log<ID, Data>::Delete(job_id, id); }
@@ -425,7 +462,9 @@ class Set : private Log<ID, Data>,
   /// \param done Callback that is called once the data has been written to the
   /// GCS.
   /// \return Status
-  Status Add(const JobID &job_id, const ID &id, const std::shared_ptr<Data> &data,
+  Status Add(const JobID &job_id,
+             const ID &id,
+             const std::shared_ptr<Data> &data,
              const WriteCallback &done);
 
   /// Remove an entry from the set.
@@ -436,10 +475,13 @@ class Set : private Log<ID, Data>,
   /// \param done Callback that is called once the data has been written to the
   /// GCS.
   /// \return Status
-  Status Remove(const JobID &job_id, const ID &id, const std::shared_ptr<Data> &data,
+  Status Remove(const JobID &job_id,
+                const ID &id,
+                const std::shared_ptr<Data> &data,
                 const WriteCallback &done);
 
-  Status Subscribe(const JobID &job_id, const ClientID &client_id,
+  Status Subscribe(const JobID &job_id,
+                   const ClientID &client_id,
                    const NotificationCallback &subscribe,
                    const SubscriptionCallback &done) {
     return Log<ID, Data>::Subscribe(job_id, client_id, subscribe, done);
@@ -471,12 +513,13 @@ class HashInterface {
 
   /// The callback function used by function Update & Lookup.
   ///
-  /// \param client The client on which the RemoveEntries is called.
-  /// \param id The ID of the Hash Table whose entries are removed.
+  /// \param client The client on which the Update & Lookup is called.
+  /// \param id The ID of the Hash Table whose entries are updated & lookuped.
   /// \param data Map data contains the change to the Hash Table.
   /// \return Void
-  using HashCallback =
-      std::function<void(RedisGcsClient *client, const ID &id, const DataMap &pairs)>;
+  using HashCallback = std::function<void(RedisGcsClient *client,
+                                          const ID &id,
+                                          const DataMap &pairs)>;
 
   /// The callback function used by function RemoveEntries.
   ///
@@ -484,7 +527,8 @@ class HashInterface {
   /// \param id The ID of the Hash Table whose entries are removed.
   /// \param keys The keys that are moved from this Hash Table.
   /// \return Void
-  using HashRemoveCallback = std::function<void(RedisGcsClient *client, const ID &id,
+  using HashRemoveCallback = std::function<void(RedisGcsClient *client,
+                                                const ID &id,
                                                 const std::vector<std::string> &keys)>;
 
   /// The notification function used by function Subscribe.
@@ -494,8 +538,10 @@ class HashInterface {
   /// \param data Map data contains the change to the Hash Table.
   /// \return Void
   using HashNotificationCallback =
-      std::function<void(RedisGcsClient *client, const ID &id,
-                         const GcsChangeMode change_mode, const DataMap &data)>;
+      std::function<void(RedisGcsClient *client,
+                         const ID &id,
+                         const GcsChangeMode change_mode,
+                         const DataMap &data)>;
 
   /// Add entries of a hash table.
   ///
@@ -505,7 +551,9 @@ class HashInterface {
   /// \param done HashCallback that is called once the request data has been written to
   /// the GCS.
   /// \return Status
-  virtual Status Update(const JobID &job_id, const ID &id, const DataMap &pairs,
+  virtual Status Update(const JobID &job_id,
+                        const ID &id,
+                        const DataMap &pairs,
                         const HashCallback &done) = 0;
 
   /// Remove entries from the hash table.
@@ -516,7 +564,8 @@ class HashInterface {
   /// \param remove_callback HashRemoveCallback that is called once the data has been
   /// written to the GCS no matter whether the key exists in the hash table.
   /// \return Status
-  virtual Status RemoveEntries(const JobID &job_id, const ID &id,
+  virtual Status RemoveEntries(const JobID &job_id,
+                               const ID &id,
                                const std::vector<std::string> &keys,
                                const HashRemoveCallback &remove_callback) = 0;
 
@@ -527,7 +576,8 @@ class HashInterface {
   /// \param lookup HashCallback that is called after lookup. If the callback is
   /// called with an empty hash table, then there was no data in the callback.
   /// \return Status
-  virtual Status Lookup(const JobID &job_id, const ID &id,
+  virtual Status Lookup(const JobID &job_id,
+                        const ID &id,
                         const HashCallback &lookup) = 0;
 
   /// Subscribe to any Update or Remove operations to this hash table.
@@ -542,7 +592,8 @@ class HashInterface {
   /// \param done SubscriptionCallback that is called when subscription is complete and
   /// we are ready to receive messages.
   /// \return Status
-  virtual Status Subscribe(const JobID &job_id, const ClientID &client_id,
+  virtual Status Subscribe(const JobID &job_id,
+                           const ClientID &client_id,
                            const HashNotificationCallback &subscribe,
                            const SubscriptionCallback &done) = 0;
 
@@ -557,8 +608,7 @@ class Hash : private Log<ID, Data>,
   using DataMap = std::unordered_map<std::string, std::shared_ptr<Data>>;
   using HashCallback = typename HashInterface<ID, Data>::HashCallback;
   using HashRemoveCallback = typename HashInterface<ID, Data>::HashRemoveCallback;
-  using HashNotificationCallback =
-      typename HashInterface<ID, Data>::HashNotificationCallback;
+  using HashNotificationCallback = typename HashInterface<ID, Data>::HashNotificationCallback;
   using SubscriptionCallback = typename Log<ID, Data>::SubscriptionCallback;
 
   Hash(const std::vector<std::shared_ptr<RedisContext>> &contexts, RedisGcsClient *client)
@@ -567,16 +617,22 @@ class Hash : private Log<ID, Data>,
   using Log<ID, Data>::RequestNotifications;
   using Log<ID, Data>::CancelNotifications;
 
-  Status Update(const JobID &job_id, const ID &id, const DataMap &pairs,
+  Status Update(const JobID &job_id,
+                const ID &id,
+                const DataMap &pairs,
                 const HashCallback &done) override;
 
-  Status Subscribe(const JobID &job_id, const ClientID &client_id,
+  Status Subscribe(const JobID &job_id,
+                   const ClientID &client_id,
                    const HashNotificationCallback &subscribe,
                    const SubscriptionCallback &done) override;
 
-  Status Lookup(const JobID &job_id, const ID &id, const HashCallback &lookup) override;
+  Status Lookup(const JobID &job_id,
+                const ID &id,
+                const HashCallback &lookup) override;
 
-  Status RemoveEntries(const JobID &job_id, const ID &id,
+  Status RemoveEntries(const JobID &job_id,
+                       const ID &id,
                        const std::vector<std::string> &keys,
                        const HashRemoveCallback &remove_callback) override;
 
@@ -699,7 +755,8 @@ class TaskLeaseTable : public Table<TaskID, TaskLeaseData> {
     prefix_ = TablePrefix::TASK_LEASE;
   }
 
-  Status Add(const JobID &job_id, const TaskID &id,
+  Status Add(const JobID &job_id,
+             const TaskID &id,
              const std::shared_ptr<TaskLeaseData> &data,
              const WriteCallback &done) override {
     RAY_RETURN_NOT_OK((Table<TaskID, TaskLeaseData>::Add(job_id, id, data, done)));
@@ -709,7 +766,8 @@ class TaskLeaseTable : public Table<TaskID, TaskLeaseData> {
     // entry will overestimate the expiration time.
     // TODO(swang): Use a common helper function to format the key instead of
     // hardcoding it to match the Redis module.
-    std::vector<std::string> args = {"PEXPIRE", TablePrefix_Name(prefix_) + id.Binary(),
+    std::vector<std::string> args = {"PEXPIRE",
+                                     TablePrefix_Name(prefix_) + id.Binary(),
                                      std::to_string(data->timeout())};
 
     return GetRedisContext(id)->RunArgvAsync(args);
@@ -740,7 +798,8 @@ class ActorCheckpointIdTable : public Table<ActorID, ActorCheckpointIdData> {
   /// \param actor_id ID of the actor.
   /// \param checkpoint_id ID of the checkpoint.
   /// \return Status.
-  Status AddCheckpointId(const JobID &job_id, const ActorID &actor_id,
+  Status AddCheckpointId(const JobID &job_id,
+                         const ActorID &actor_id,
                          const ActorCheckpointID &checkpoint_id);
 };
 
@@ -756,7 +815,8 @@ class TaskTable : public Table<TaskID, TaskTableData> {
   }
 
   TaskTable(const std::vector<std::shared_ptr<RedisContext>> &contexts,
-            RedisGcsClient *client, gcs::CommandType command_type)
+            RedisGcsClient *client,
+            gcs::CommandType command_type)
       : TaskTable(contexts, client) {
     command_type_ = command_type;
   };
@@ -786,8 +846,10 @@ class ErrorTable : private Log<JobID, ErrorTableData> {
   /// \param timestamp The timestamp of the error.
   /// \return Status.
   // TODO(qwang): refactor this API to implement broadcast.
-  Status PushErrorToDriver(const JobID &job_id, const std::string &type,
-                           const std::string &error_message, double timestamp);
+  Status PushErrorToDriver(const JobID &job_id,
+                           const std::string &type,
+                           const std::string &error_message,
+                           double timestamp);
 
   /// Returns debug string for class.
   ///
@@ -826,11 +888,13 @@ class ProfileTable : private Log<UniqueID, ProfileTableData> {
 /// to reconnect, it must connect with a different ClientID.
 class ClientTable : public Log<ClientID, GcsNodeInfo> {
  public:
-  using ClientTableCallback = std::function<void(
-      RedisGcsClient *client, const ClientID &id, const GcsNodeInfo &data)>;
+  using ClientTableCallback = std::function<void(RedisGcsClient *client,
+                                                 const ClientID &id,
+                                                 const GcsNodeInfo &data)>;
   using DisconnectCallback = std::function<void(void)>;
   ClientTable(const std::vector<std::shared_ptr<RedisContext>> &contexts,
-              RedisGcsClient *client, const ClientID &node_id)
+              RedisGcsClient *client,
+              const ClientID &node_id)
       : Log(contexts, client),
         // We set the client log's key equal to nil so that all instances of
         // ClientTable have the same key.

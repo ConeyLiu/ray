@@ -22,11 +22,13 @@ class NodeManagerClient {
   /// \param[in] address Address of the node manager server.
   /// \param[in] port Port of the node manager server.
   /// \param[in] client_call_manager The `ClientCallManager` used for managing requests.
-  NodeManagerClient(const std::string &address, const int port,
+  NodeManagerClient(const std::string &address,
+                    const int port,
                     ClientCallManager &client_call_manager)
       : client_call_manager_(client_call_manager) {
     std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
-        address + ":" + std::to_string(port), grpc::InsecureChannelCredentials());
+            address + ":" + std::to_string(port),
+            grpc::InsecureChannelCredentials());
     stub_ = NodeManagerService::NewStub(channel);
   };
 
@@ -36,9 +38,10 @@ class NodeManagerClient {
   /// \param[in] callback The callback function that handles reply.
   void ForwardTask(const ForwardTaskRequest &request,
                    const ClientCallback<ForwardTaskReply> &callback) {
-    client_call_manager_
-        .CreateCall<NodeManagerService, ForwardTaskRequest, ForwardTaskReply>(
-            *stub_, &NodeManagerService::Stub::PrepareAsyncForwardTask, request,
+    client_call_manager_.CreateCall<NodeManagerService, ForwardTaskRequest, ForwardTaskReply>(
+            *stub_,
+            &NodeManagerService::Stub::PrepareAsyncForwardTask,
+            request,
             callback);
   }
 
@@ -46,7 +49,10 @@ class NodeManagerClient {
   void GetNodeStats(const ClientCallback<NodeStatsReply> &callback) {
     NodeStatsRequest request;
     client_call_manager_.CreateCall<NodeManagerService, NodeStatsRequest, NodeStatsReply>(
-        *stub_, &NodeManagerService::Stub::PrepareAsyncGetNodeStats, request, callback);
+        *stub_,
+        &NodeManagerService::Stub::PrepareAsyncGetNodeStats,
+        request,
+        callback);
   }
 
  private:
@@ -67,7 +73,8 @@ class NodeManagerWorkerClient
   /// \param[in] port Port of the node manager server.
   /// \param[in] client_call_manager The `ClientCallManager` used for managing requests.
   static std::shared_ptr<NodeManagerWorkerClient> make(
-      const std::string &address, const int port,
+      const std::string &address,
+      const int port,
       ClientCallManager &client_call_manager) {
     auto instance = new NodeManagerWorkerClient(address, port, client_call_manager);
     return std::shared_ptr<NodeManagerWorkerClient>(instance);
@@ -76,16 +83,20 @@ class NodeManagerWorkerClient
   /// Request a worker lease.
   ray::Status RequestWorkerLease(const WorkerLeaseRequest &request,
                                  const ClientCallback<WorkerLeaseReply> &callback) {
-    auto call = client_call_manager_
-                    .CreateCall<NodeManagerService, WorkerLeaseRequest, WorkerLeaseReply>(
-                        *stub_, &NodeManagerService::Stub::PrepareAsyncRequestWorkerLease,
-                        request, callback);
+    auto call = client_call_manager_.CreateCall<NodeManagerService,
+                                                WorkerLeaseRequest,
+                                                WorkerLeaseReply>(
+        *stub_,
+        &NodeManagerService::Stub::PrepareAsyncRequestWorkerLease,
+        request,
+        callback);
     return call->GetStatus();
   }
 
   ray::Status ReturnWorker(const ReturnWorkerRequest &request,
                            const ClientCallback<ReturnWorkerReply> &callback) {
-    auto call = client_call_manager_.CreateCall<NodeManagerService, ReturnWorkerRequest,
+    auto call = client_call_manager_.CreateCall<NodeManagerService,
+                                                ReturnWorkerRequest,
                                                 ReturnWorkerReply>(
         *stub_, &NodeManagerService::Stub::PrepareAsyncReturnWorker, request, callback);
     return call->GetStatus();
@@ -97,11 +108,13 @@ class NodeManagerWorkerClient
   /// \param[in] address Address of the node manager server.
   /// \param[in] port Port of the node manager server.
   /// \param[in] client_call_manager The `ClientCallManager` used for managing requests.
-  NodeManagerWorkerClient(const std::string &address, const int port,
+  NodeManagerWorkerClient(const std::string &address,
+                          const int port,
                           ClientCallManager &client_call_manager)
       : client_call_manager_(client_call_manager) {
     std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(
-        address + ":" + std::to_string(port), grpc::InsecureChannelCredentials());
+        address + ":" + std::to_string(port),
+        grpc::InsecureChannelCredentials());
     stub_ = NodeManagerService::NewStub(channel);
   };
 

@@ -29,7 +29,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubmitTask(TaskSpecification task_spe
     request->mutable_task_spec()->CopyFrom(task_spec.GetMessage());
 
     absl::MutexLock lock(&mu_);
-
+    // pending_requests_[actor_id] is a ordering map
     auto inserted = pending_requests_[actor_id].emplace(send_pos, std::move(request));
     RAY_CHECK(inserted.second);
 
@@ -99,10 +99,10 @@ void CoreWorkerDirectActorTaskSubmitter::DisconnectActor(const ActorID &actor_id
 }
 
 void CoreWorkerDirectActorTaskSubmitter::SendPendingTasks(const ActorID &actor_id) {
-  auto &client = rpc_clients_[actor_id];
+  auto &client = rpc_clients_[actor_id]; // core worker client
   RAY_CHECK(client);
   // Submit all pending requests.
-  auto &requests = pending_requests_[actor_id];
+  auto &requests = pending_requests_[actor_id]; // the requests is an ordering map
   auto head = requests.begin();
   while (head != requests.end() && head->first == next_send_position_[actor_id]) {
     auto request = std::move(head->second);
@@ -115,8 +115,11 @@ void CoreWorkerDirectActorTaskSubmitter::SendPendingTasks(const ActorID &actor_i
 }
 
 void CoreWorkerDirectActorTaskSubmitter::PushActorTask(
-    rpc::CoreWorkerClientInterface &client, std::unique_ptr<rpc::PushTaskRequest> request,
-    const ActorID &actor_id, const TaskID &task_id, int num_returns) {
+    rpc::CoreWorkerClientInterface &client,
+    std::unique_ptr<rpc::PushTaskRequest> request,
+    const ActorID &actor_id,
+    const TaskID &task_id,
+    int num_returns) {
   RAY_LOG(DEBUG) << "Pushing task " << task_id << " to actor " << actor_id;
   next_send_position_[actor_id]++;
   auto it = worker_ids_.find(actor_id);
@@ -181,7 +184,8 @@ void CoreWorkerDirectTaskReceiver::SetActorAsAsync() {
 };
 
 void CoreWorkerDirectTaskReceiver::HandlePushTask(
-    const rpc::PushTaskRequest &request, rpc::PushTaskReply *reply,
+    const rpc::PushTaskRequest &request,
+    rpc::PushTaskReply *reply,
     rpc::SendReplyCallback send_reply_callback) {
   RAY_CHECK(waiter_ != nullptr) << "Must call init() prior to use";
   const TaskSpecification task_spec(request.task_spec());
@@ -237,7 +241,8 @@ void CoreWorkerDirectTaskReceiver::HandlePushTask(
       for (size_t i = 0; i < return_objects.size(); i++) {
         auto return_object = reply->add_return_objects();
         ObjectID id = ObjectID::ForTaskReturn(
-            task_spec.TaskId(), /*index=*/i + 1,
+            task_spec.TaskId(),
+            /*index=*/i + 1,
             /*transport_type=*/static_cast<int>(TaskTransportType::DIRECT));
         return_object->set_object_id(id.Binary());
 
@@ -247,7 +252,8 @@ void CoreWorkerDirectTaskReceiver::HandlePushTask(
           return_object->set_in_plasma(true);
         } else {
           if (result->GetData() != nullptr) {
-            return_object->set_data(result->GetData()->Data(), result->GetData()->Size());
+            return_object->set_data(result->GetData()->Data(),
+                                    result->GetData()->Size());
           }
           if (result->GetMetadata() != nullptr) {
             return_object->set_metadata(result->GetMetadata()->Data(),
@@ -288,12 +294,19 @@ void CoreWorkerDirectTaskReceiver::HandlePushTask(
   if (it == scheduling_queue_.end()) {
     auto result = scheduling_queue_.emplace(
         task_spec.CallerId(),
-        std::unique_ptr<SchedulingQueue>(new SchedulingQueue(
-            task_main_io_service_, *waiter_, pool_, is_asyncio_, fiber_rate_limiter_)));
+        std::unique_ptr<SchedulingQueue>(
+                new SchedulingQueue(task_main_io_service_,
+                                        *waiter_,
+                                        pool_,
+                                        is_asyncio_,
+                                        fiber_rate_limiter_)));
     it = result.first;
   }
-  it->second->Add(request.sequence_number(), request.client_processed_up_to(),
-                  accept_callback, reject_callback, dependencies);
+  it->second->Add(request.sequence_number(),
+                  request.client_processed_up_to(),
+                  accept_callback,
+                  reject_callback,
+                  dependencies);
 }
 
 void CoreWorkerDirectTaskReceiver::HandleDirectActorCallArgWaitComplete(

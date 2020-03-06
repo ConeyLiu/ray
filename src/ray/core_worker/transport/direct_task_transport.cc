@@ -32,12 +32,13 @@ void CoreWorkerDirectTaskSubmitter::AddWorkerLeaseClient(
     RAY_LOG(INFO) << "Connected to " << addr.ip_address << ":" << addr.port;
   }
   int64_t expiration = current_time_ms() + lease_timeout_ms_;
-  worker_to_lease_client_.emplace(addr,
-                                  std::make_pair(std::move(lease_client), expiration));
+  worker_to_lease_client_.emplace(addr, std::make_pair(std::move(lease_client), expiration));
 }
 
 void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
-    const rpc::WorkerAddress &addr, const SchedulingKey &scheduling_key, bool was_error,
+    const rpc::WorkerAddress &addr,
+    const SchedulingKey &scheduling_key,
+    bool was_error,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto lease_entry = worker_to_lease_client_[addr];
   auto queue_entry = task_queues_.find(scheduling_key);
@@ -53,8 +54,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     worker_to_lease_client_.erase(addr);
   } else {
     auto &client = *client_cache_[addr];
-    PushNormalTask(addr, client, scheduling_key, queue_entry->second.front(),
-                   assigned_resources);
+    PushNormalTask(addr, client, scheduling_key, queue_entry->second.front(), assigned_resources);
     queue_entry->second.pop_front();
     // Delete the queue if it's now empty. Note that the queue cannot already be empty
     // because this is the only place tasks are removed from it.
@@ -116,13 +116,13 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
             // assign work to the worker.
             RAY_LOG(DEBUG) << "Lease granted " << task_id;
             rpc::WorkerAddress addr = {
-                reply.worker_address().ip_address(), reply.worker_address().port(),
+                reply.worker_address().ip_address(),
+                reply.worker_address().port(),
                 WorkerID::FromBinary(reply.worker_address().worker_id()),
                 ClientID::FromBinary(reply.worker_address().raylet_id())};
             AddWorkerLeaseClient(addr, std::move(lease_client));
             auto resources_copy = reply.resource_mapping();
-            OnWorkerIdle(addr, scheduling_key,
-                         /*error=*/false, resources_copy);
+            OnWorkerIdle(addr, scheduling_key, /*error=*/false, resources_copy);
           } else {
             // The raylet redirected us to a different raylet to retry at.
             RequestNewWorkerIfNeeded(scheduling_key, &reply.retry_at_raylet_address());
@@ -156,8 +156,10 @@ void CoreWorkerDirectTaskSubmitter::RetryLeaseRequest(
 }
 
 void CoreWorkerDirectTaskSubmitter::PushNormalTask(
-    const rpc::WorkerAddress &addr, rpc::CoreWorkerClientInterface &client,
-    const SchedulingKey &scheduling_key, const TaskSpecification &task_spec,
+    const rpc::WorkerAddress &addr,
+    rpc::CoreWorkerClientInterface &client,
+    const SchedulingKey &scheduling_key,
+    const TaskSpecification &task_spec,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto task_id = task_spec.TaskId();
   auto request = std::unique_ptr<rpc::PushTaskRequest>(new rpc::PushTaskRequest);

@@ -18,9 +18,9 @@
 
 namespace ray {
 
-typedef std::function<std::shared_ptr<WorkerLeaseInterface>(const std::string &ip_address,
-                                                            int port)>
-    LeaseClientFactoryFn;
+using LeaseClientFactoryFn =
+        std::function<std::shared_ptr<WorkerLeaseInterface>(const std::string &ip_address,
+                                                            int port)>;
 
 // The task queues are keyed on resource shape & function descriptor
 // (encapsulated in SchedulingClass) to defer resource allocation decisions to the raylet
@@ -37,7 +37,8 @@ class CoreWorkerDirectTaskSubmitter {
                                 LeaseClientFactoryFn lease_client_factory,
                                 std::shared_ptr<CoreWorkerMemoryStore> store,
                                 std::shared_ptr<TaskFinisherInterface> task_finisher,
-                                ClientID local_raylet_id, int64_t lease_timeout_ms)
+                                ClientID local_raylet_id,
+                                int64_t lease_timeout_ms)
       : local_lease_client_(lease_client),
         client_factory_(client_factory),
         lease_client_factory_(lease_client_factory),
@@ -61,7 +62,9 @@ class CoreWorkerDirectTaskSubmitter {
   /// \param[in] was_error Whether the task failed to be submitted.
   /// \param[in] assigned_resources Resource ids previously assigned to the worker.
   void OnWorkerIdle(
-      const rpc::WorkerAddress &addr, const SchedulingKey &task_queue_key, bool was_error,
+      const rpc::WorkerAddress &addr,
+      const SchedulingKey &task_queue_key,
+      bool was_error,
       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources)
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 

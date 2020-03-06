@@ -15,7 +15,9 @@ void ReferenceCounter::AddBorrowedObject(const ObjectID &object_id,
 }
 
 void ReferenceCounter::AddOwnedObject(
-    const ObjectID &object_id, const TaskID &owner_id, const rpc::Address &owner_address,
+    const ObjectID &object_id,
+    const TaskID &owner_id,
+    const rpc::Address &owner_address,
     std::shared_ptr<std::vector<ObjectID>> dependencies) {
   absl::MutexLock lock(&mutex_);
 
@@ -89,7 +91,8 @@ void ReferenceCounter::RemoveReferenceRecursive(const ObjectID &object_id,
   }
 }
 
-bool ReferenceCounter::GetOwner(const ObjectID &object_id, TaskID *owner_id,
+bool ReferenceCounter::GetOwner(const ObjectID &object_id,
+                                TaskID *owner_id,
                                 rpc::Address *owner_address) const {
   absl::MutexLock lock(&mutex_);
   auto it = object_id_refs_.find(object_id);

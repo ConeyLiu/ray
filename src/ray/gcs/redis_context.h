@@ -84,7 +84,9 @@ class RedisCallbackManager {
   struct CallbackItem : public std::enable_shared_from_this<CallbackItem> {
     CallbackItem() = default;
 
-    CallbackItem(const RedisCallback &callback, bool is_subscription, int64_t start_time,
+    CallbackItem(const RedisCallback &callback,
+                 bool is_subscription,
+                 int64_t start_time,
                  boost::asio::io_service &io_service)
         : callback_(callback),
           is_subscription_(is_subscription),
@@ -130,7 +132,9 @@ class RedisContext {
 
   ~RedisContext();
 
-  Status Connect(const std::string &address, int port, bool sharding,
+  Status Connect(const std::string &address,
+                 int port,
+                 bool sharding,
                  const std::string &password);
 
   /// Run an operation on some table key.
@@ -148,9 +152,13 @@ class RedisContext {
   /// -1 for unused. If set, then data must be provided.
   /// \return Status.
   template <typename ID>
-  Status RunAsync(const std::string &command, const ID &id, const void *data,
-                  size_t length, const TablePrefix prefix,
-                  const TablePubsub pubsub_channel, RedisCallback redisCallback,
+  Status RunAsync(const std::string &command,
+                  const ID &id,
+                  const void *data,
+                  size_t length,
+                  const TablePrefix prefix,
+                  const TablePubsub pubsub_channel,
+                  RedisCallback redisCallback,
                   int log_length = -1);
 
   /// Run an arbitrary Redis command without a callback.
@@ -166,8 +174,10 @@ class RedisContext {
   /// \param redisCallback The callback function that the notification calls.
   /// \param out_callback_index The output pointer to callback index.
   /// \return Status.
-  Status SubscribeAsync(const ClientID &client_id, const TablePubsub pubsub_channel,
-                        const RedisCallback &redisCallback, int64_t *out_callback_index);
+  Status SubscribeAsync(const ClientID &client_id,
+                        const TablePubsub pubsub_channel,
+                        const RedisCallback &redisCallback,
+                        int64_t *out_callback_index);
 
   redisContext *sync_context() {
     RAY_CHECK(context_);
@@ -192,22 +202,28 @@ class RedisContext {
 };
 
 template <typename ID>
-Status RedisContext::RunAsync(const std::string &command, const ID &id, const void *data,
-                              size_t length, const TablePrefix prefix,
+Status RedisContext::RunAsync(const std::string &command,
+                              const ID &id,
+                              const void *data,
+                              size_t length,  // data length
+                              const TablePrefix prefix,
                               const TablePubsub pubsub_channel,
-                              RedisCallback redisCallback, int log_length) {
+                              RedisCallback redisCallback,
+                              int log_length ) {
   RAY_CHECK(redis_async_context_);
   int64_t callback_index =
       RedisCallbackManager::instance().add(redisCallback, false, io_service_);
   Status status = Status::OK();
   if (length > 0) {
     if (log_length >= 0) {
+      // prefix pubsub_channel id data log_length
       std::string redis_command = command + " %d %d %b %b %d";
       status = redis_async_context_->RedisAsyncCommand(
           reinterpret_cast<redisCallbackFn *>(&GlobalRedisCallback),
           reinterpret_cast<void *>(callback_index), redis_command.c_str(), prefix,
           pubsub_channel, id.Data(), id.Size(), data, length, log_length);
     } else {
+      // prefix pubsub_channel id data
       std::string redis_command = command + " %d %d %b %b";
       status = redis_async_context_->RedisAsyncCommand(
           reinterpret_cast<redisCallbackFn *>(&GlobalRedisCallback),
@@ -216,6 +232,7 @@ Status RedisContext::RunAsync(const std::string &command, const ID &id, const vo
     }
   } else {
     RAY_CHECK(log_length == -1);
+    // prefix pubsub_channel id
     std::string redis_command = command + " %d %d %b";
     status = redis_async_context_->RedisAsyncCommand(
         reinterpret_cast<redisCallbackFn *>(&GlobalRedisCallback),

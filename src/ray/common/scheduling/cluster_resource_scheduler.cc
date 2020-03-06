@@ -1,5 +1,7 @@
 #include "cluster_resource_scheduler.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedValue"
 std::string NodeResources::DebugString() {
   std::stringstream buffer;
   buffer << "  node predefined resources {";
@@ -203,7 +205,7 @@ int64_t ClusterResourceScheduler::GetBestSchedulableNode(const TaskRequest &task
     }
   }
 
-  // Check whether any node in the request placement_hints, satisfes
+  // Check whether any node in the request placement_hints, satisfies
   // all resource constraints of the request.
   for (auto it_p = task_req.placement_hints.begin();
        it_p != task_req.placement_hints.end(); ++it_p) {
@@ -245,7 +247,6 @@ std::string ClusterResourceScheduler::GetBestSchedulableNode(
   ResourceMapToTaskRequest(task_resources, &task_request);
   int64_t node_id = GetBestSchedulableNode(task_request, total_violations);
 
-  std::string id_string;
   if (node_id == -1) {
     return "";
   }
@@ -267,8 +268,8 @@ bool ClusterResourceScheduler::SubtractNodeAvailableResources(
 
   for (size_t i = 0; i < PredefinedResources_MAX; i++) {
     resources.capacities[i].available =
-        std::max(static_cast<int64_t>(0), resources.capacities[i].available -
-                                              task_req.predefined_resources[i].demand);
+        std::max(static_cast<int64_t>(0),
+                resources.capacities[i].available - task_req.predefined_resources[i].demand);
   }
 
   for (size_t i = 0; i < task_req.custom_resources.size(); i++) {
@@ -485,3 +486,5 @@ std::string ClusterResourceScheduler::DebugString(void) {
   }
   return buffer.str();
 }
+
+#pragma clang diagnostic pop

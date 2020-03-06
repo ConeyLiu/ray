@@ -22,7 +22,10 @@ namespace raylet {
 class Worker {
  public:
   /// A constructor that initializes a worker object.
-  Worker(const WorkerID &worker_id, pid_t pid, const Language &language, int port,
+  Worker(const WorkerID &worker_id,
+         pid_t pid,
+         const Language &language,
+         int port,
          std::shared_ptr<LocalClientConnection> connection,
          rpc::ClientCallManager &client_call_manager);
   /// A destructor responsible for freeing all worker state.

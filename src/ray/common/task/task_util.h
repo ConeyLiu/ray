@@ -24,10 +24,14 @@ class TaskSpecBuilder {
   ///
   /// \return Reference to the builder object itself.
   TaskSpecBuilder &SetCommonTaskSpec(
-      const TaskID &task_id, const Language &language,
-      const std::vector<std::string> &function_descriptor, const JobID &job_id,
-      const TaskID &parent_task_id, uint64_t parent_counter, const TaskID &caller_id,
-      const rpc::Address &caller_address, uint64_t num_returns, bool is_direct_call,
+      const TaskID &task_id,
+      const Language &language,
+      const std::vector<std::string> &function_descriptor,
+      const JobID &job_id,
+      const TaskID &parent_task_id, uint64_t parent_counter,
+      const TaskID &caller_id,
+      const rpc::Address &caller_address, uint64_t num_returns,
+      bool is_direct_call,
       const std::unordered_map<std::string, double> &required_resources,
       const std::unordered_map<std::string, double> &required_placement_resources) {
     message_->set_type(TaskType::NORMAL_TASK);
@@ -93,9 +97,12 @@ class TaskSpecBuilder {
   ///
   /// \return Reference to the builder object itself.
   TaskSpecBuilder &SetActorCreationTaskSpec(
-      const ActorID &actor_id, uint64_t max_reconstructions = 0,
+      const ActorID &actor_id,
+      uint64_t max_reconstructions = 0,
       const std::vector<std::string> &dynamic_worker_options = {},
-      bool is_direct_call = false, int max_concurrency = 1, bool is_detached = false,
+      bool is_direct_call = false,
+      int max_concurrency = 1,
+      bool is_detached = false,
       bool is_asyncio = false) {
     message_->set_type(TaskType::ACTOR_CREATION_TASK);
     auto actor_creation_spec = message_->mutable_actor_creation_task_spec();

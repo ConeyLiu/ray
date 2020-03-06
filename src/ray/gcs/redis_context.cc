@@ -130,8 +130,10 @@ void GlobalRedisCallback(void *c, void *r, void *privdata) {
   ProcessCallback(callback_index, std::make_shared<CallbackReply>(reply));
 }
 
-int64_t RedisCallbackManager::add(const RedisCallback &function, bool is_subscription,
-                                  boost::asio::io_service &io_service) {
+int64_t RedisCallbackManager::add(
+        const RedisCallback &function,
+        bool is_subscription,
+        boost::asio::io_service &io_service) {
   auto start_time = absl::GetCurrentTimeNanos() / 1000;
 
   std::lock_guard<std::mutex> lock(mutex_);
@@ -226,8 +228,11 @@ Status ConnectWithRetries(const std::string &address, int port,
   return Status::OK();
 }
 
-Status RedisContext::Connect(const std::string &address, int port, bool sharding,
-                             const std::string &password = "") {
+Status RedisContext::Connect(
+        const std::string &address,
+        int port,
+        bool sharding,
+        const std::string &password = "") {
   RAY_CHECK(!context_);
   RAY_CHECK(!redis_async_context_);
   RAY_CHECK(!async_redis_subscribe_context_);

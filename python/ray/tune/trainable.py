@@ -76,12 +76,9 @@ class Trainable(object):
             self._logdir = self._result_logger.logdir
         else:
             logdir_prefix = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
-            ray.utils.try_to_create_directory(
-                DEFAULT_RESULTS_DIR, warn_if_exist=False)
-            self._logdir = tempfile.mkdtemp(
-                prefix=logdir_prefix, dir=DEFAULT_RESULTS_DIR)
-            self._result_logger = UnifiedLogger(
-                self.config, self._logdir, loggers=None)
+            ray.utils.try_to_create_directory(DEFAULT_RESULTS_DIR, warn_if_exist=False)
+            self._logdir = tempfile.mkdtemp(prefix=logdir_prefix, dir=DEFAULT_RESULTS_DIR)
+            self._result_logger = UnifiedLogger(self.config, self._logdir, loggers=None)
 
         self._iteration = 0
         self._time_total = 0.0
@@ -262,8 +259,7 @@ class Trainable(object):
             if not checkpoint.startswith(checkpoint_dir):
                 raise ValueError(
                     "The returned checkpoint path must be within the "
-                    "given checkpoint dir {}: {}".format(
-                        checkpoint_dir, checkpoint))
+                    "given checkpoint dir {}: {}".format(checkpoint_dir, checkpoint))
             checkpoint_path = checkpoint
         elif isinstance(checkpoint, dict):
             saved_as_dict = True

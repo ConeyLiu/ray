@@ -5,8 +5,11 @@
 namespace {
 
 ray::rpc::ActorHandle CreateInnerActorHandle(
-    const class ActorID &actor_id, const class JobID &job_id,
-    const ObjectID &initial_cursor, const Language actor_language, bool is_direct_call,
+    const class ActorID &actor_id,
+    const class JobID &job_id,
+    const ObjectID &initial_cursor,
+    const Language actor_language,
+    bool is_direct_call,
     const std::vector<std::string> &actor_creation_task_function_descriptor) {
   ray::rpc::ActorHandle inner;
   inner.set_actor_id(actor_id.Data(), actor_id.Size());
@@ -31,12 +34,19 @@ ray::rpc::ActorHandle CreateInnerActorHandleFromString(const std::string &serial
 namespace ray {
 
 ActorHandle::ActorHandle(
-    const class ActorID &actor_id, const class JobID &job_id,
-    const ObjectID &initial_cursor, const Language actor_language, bool is_direct_call,
+    const class ActorID &actor_id,
+    const class JobID &job_id,
+    const ObjectID &initial_cursor,
+    const Language actor_language,
+    bool is_direct_call,
     const std::vector<std::string> &actor_creation_task_function_descriptor)
-    : ActorHandle(CreateInnerActorHandle(actor_id, job_id, initial_cursor, actor_language,
-                                         is_direct_call,
-                                         actor_creation_task_function_descriptor)) {}
+    : ActorHandle(CreateInnerActorHandle(
+            actor_id,
+            job_id,
+            initial_cursor,
+            actor_language,
+            is_direct_call,
+            actor_creation_task_function_descriptor)) {}
 
 ActorHandle::ActorHandle(const std::string &serialized)
     : ActorHandle(CreateInnerActorHandleFromString(serialized)) {}
@@ -48,9 +58,11 @@ void ActorHandle::SetActorTaskSpec(TaskSpecBuilder &builder,
   // Build actor task spec.
   const TaskID actor_creation_task_id = TaskID::ForActorCreationTask(GetActorID());
   const ObjectID actor_creation_dummy_object_id =
-      ObjectID::ForTaskReturn(actor_creation_task_id, /*index=*/1,
+      ObjectID::ForTaskReturn(actor_creation_task_id,
+                              /*index=*/1,
                               /*transport_type=*/static_cast<int>(transport_type));
-  builder.SetActorTaskSpec(GetActorID(), actor_creation_dummy_object_id,
+  builder.SetActorTaskSpec(GetActorID(),
+                           actor_creation_dummy_object_id,
                            /*previous_actor_task_dummy_object_id=*/actor_cursor_,
                            task_counter_++);
   actor_cursor_ = new_cursor;

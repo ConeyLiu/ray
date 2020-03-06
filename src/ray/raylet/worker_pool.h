@@ -17,8 +17,7 @@ namespace ray {
 
 namespace raylet {
 
-using WorkerCommandMap =
-    std::unordered_map<Language, std::vector<std::string>, std::hash<int>>;
+using WorkerCommandMap = std::unordered_map<Language, std::vector<std::string>, std::hash<int>>;
 
 class Worker;
 
@@ -40,7 +39,8 @@ class WorkerPool {
   /// resources on the machine).
   /// \param worker_commands The commands used to start the worker process, grouped by
   /// language.
-  WorkerPool(int num_workers, int maximum_startup_concurrency,
+  WorkerPool(int num_workers,
+             int maximum_startup_concurrency,
              std::shared_ptr<gcs::RedisGcsClient> gcs_client,
              const WorkerCommandMap &worker_commands);
 
