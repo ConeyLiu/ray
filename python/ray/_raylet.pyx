@@ -974,8 +974,8 @@ cdef class CoreWorker:
             with self.profile_event(b"submit_task.prepare_args"):
                 prepare_args(args, &args_vector)
 
-            with nogil:
-                with self.profile_event(b"submit_task.submit_task"):
+            with self.profile_event(b"submit_task.submit_task"):
+                with nogil:
                     check_status(self.core_worker.get().SubmitTask(
                         ray_function, args_vector, task_options, &return_ids, max_retries))
 
