@@ -965,17 +965,19 @@ cdef class CoreWorker:
             c_vector[CObjectID] return_ids
 
         with self.profile_event(b"submit_task"):
-            prepare_resources(resources, &c_resources)
+            with self.profile_event(b"submit_task.prepare_resources"):
+                prepare_resources(resources, &c_resources)
             task_options = CTaskOptions(
                 num_return_vals, is_direct_call, c_resources)
             ray_function = CRayFunction(
                 LANGUAGE_PYTHON, string_vector_from_list(function_descriptor))
-            prepare_args(args, &args_vector)
+            with self.profile_event(b"submit_task.prepare_args"):
+                prepare_args(args, &args_vector)
 
             with nogil:
-                check_status(self.core_worker.get().SubmitTask(
-                    ray_function, args_vector, task_options, &return_ids,
-                    max_retries))
+                with self.profile_event(b"submit_task.submit_task"):
+                    check_status(self.core_worker.get().SubmitTask(
+                        ray_function, args_vector, task_options, &return_ids, max_retries))
 
             return VectorToObjectIDs(return_ids)
 
