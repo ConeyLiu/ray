@@ -36,9 +36,11 @@ RedisActorInfoAccessor::RedisActorInfoAccessor(RedisGcsClient *client_impl)
     : client_impl_(client_impl), actor_sub_executor_(client_impl_->actor_table()) {}
 
 Status RedisActorInfoAccessor::AsyncGet(
-    const ActorID &actor_id, const OptionalItemCallback<ActorTableData> &callback) {
+    const ActorID &actor_id,
+    const OptionalItemCallback<ActorTableData> &callback) {
   RAY_CHECK(callback != nullptr);
-  auto on_done = [callback](RedisGcsClient *client, const ActorID &actor_id,
+  auto on_done = [callback](RedisGcsClient *client,
+                            const ActorID &actor_id,
                             const std::vector<ActorTableData> &data) {
     boost::optional<ActorTableData> result;
     if (!data.empty()) {
@@ -51,15 +53,18 @@ Status RedisActorInfoAccessor::AsyncGet(
 }
 
 Status RedisActorInfoAccessor::AsyncRegister(
-    const std::shared_ptr<ActorTableData> &data_ptr, const StatusCallback &callback) {
-  auto on_success = [callback](RedisGcsClient *client, const ActorID &actor_id,
+    const std::shared_ptr<ActorTableData> &data_ptr,
+    const StatusCallback &callback) {
+  auto on_success = [callback](RedisGcsClient *client,
+                               const ActorID &actor_id,
                                const ActorTableData &data) {
     if (callback != nullptr) {
       callback(Status::OK());
     }
   };
 
-  auto on_failure = [callback](RedisGcsClient *client, const ActorID &actor_id,
+  auto on_failure = [callback](RedisGcsClient *client,
+                               const ActorID &actor_id,
                                const ActorTableData &data) {
     if (callback != nullptr) {
       callback(Status::Invalid("Adding actor failed."));
@@ -67,13 +72,17 @@ Status RedisActorInfoAccessor::AsyncRegister(
   };
 
   ActorID actor_id = ActorID::FromBinary(data_ptr->actor_id());
-  return client_impl_->actor_table().AppendAt(JobID::Nil(), actor_id, data_ptr,
-                                              on_success, on_failure,
-                                              /*log_length*/ 0);
+  return client_impl_->actor_table().AppendAt(JobID::Nil(),
+                                              actor_id,
+                                              data_ptr,
+                                              on_success,
+                                              on_failure,
+                                              /*log_length*/0);
 }
 
 Status RedisActorInfoAccessor::AsyncUpdate(
-    const ActorID &actor_id, const std::shared_ptr<ActorTableData> &data_ptr,
+    const ActorID &actor_id,
+    const std::shared_ptr<ActorTableData> &data_ptr,
     const StatusCallback &callback) {
   // The actor log starts with an ALIVE entry. This is followed by 0 to N pairs
   // of (RECONSTRUCTING, ALIVE) entries, where N is the maximum number of
@@ -85,14 +94,14 @@ Status RedisActorInfoAccessor::AsyncUpdate(
     log_length += 1;
   }
 
-  auto on_success = [callback](RedisGcsClient *client, const ActorID &actor_id,
+  auto on_success = [callback](RedisGcsClient *client,
+                               const ActorID &actor_id,
                                const ActorTableData &data) {
     // If we successfully appended a record to the GCS table of the actor that
     // has died, signal this to anyone receiving signals from this actor.
     if (data.state() == ActorTableData::DEAD ||
         data.state() == ActorTableData::RECONSTRUCTING) {
-      std::vector<std::string> args = {"XADD", actor_id.Hex(), "*", "signal",
-                                       "ACTOR_DIED_SIGNAL"};
+      std::vector<std::string> args = {"XADD", actor_id.Hex(), "*", "signal", "ACTOR_DIED_SIGNAL"};
       auto redis_context = client->primary_context();
       RAY_CHECK_OK(redis_context->RunArgvAsync(args));
     }
@@ -102,15 +111,20 @@ Status RedisActorInfoAccessor::AsyncUpdate(
     }
   };
 
-  auto on_failure = [callback](RedisGcsClient *client, const ActorID &actor_id,
+  auto on_failure = [callback](RedisGcsClient *client,
+                               const ActorID &actor_id,
                                const ActorTableData &data) {
     if (callback != nullptr) {
       callback(Status::Invalid("Updating actor failed."));
     }
   };
 
-  return client_impl_->actor_table().AppendAt(JobID::Nil(), actor_id, data_ptr,
-                                              on_success, on_failure, log_length);
+  return client_impl_->actor_table().AppendAt(JobID::Nil(),
+                                              actor_id,
+                                              data_ptr,
+                                              on_success,
+                                              on_failure,
+                                              log_length);
 }
 
 Status RedisActorInfoAccessor::AsyncSubscribeAll(

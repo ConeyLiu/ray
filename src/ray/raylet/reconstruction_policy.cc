@@ -3,7 +3,7 @@
 #include "ray/stats/stats.h"
 
 #pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnusedValue"
+// #pragma ide diagnostic ignored "UnusedValue"
 namespace ray {
 
 namespace raylet {

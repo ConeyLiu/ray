@@ -10,8 +10,8 @@
 
 namespace ray {
 
-// Resolve values for futures that were given to us before the value
-// was available. This class is thread-safe.
+/// Resolve values for futures that were given to us before the value
+/// was available. This class is thread-safe.
 class FutureResolver {
  public:
   FutureResolver(std::shared_ptr<CoreWorkerMemoryStore> store,

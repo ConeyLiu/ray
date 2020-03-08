@@ -142,7 +142,8 @@ class CoreWorker {
   /// appended to the serialized object ID.
   /// \param[out] owner_address The address of the object's owner. This should
   /// be appended to the serialized object ID.
-  void PromoteToPlasmaAndGetOwnershipInfo(const ObjectID &object_id, TaskID *owner_id,
+  void PromoteToPlasmaAndGetOwnershipInfo(const ObjectID &object_id,
+                                          TaskID *owner_id,
                                           rpc::Address *owner_address);
 
   /// Add a reference to an ObjectID that was deserialized by the language
@@ -194,8 +195,10 @@ class CoreWorker {
   /// \param[out] object_id Object ID generated for the put.
   /// \param[out] data Buffer for the user to write the object into.
   /// \return Status.
-  Status Create(const std::shared_ptr<Buffer> &metadata, const size_t data_size,
-                ObjectID *object_id, std::shared_ptr<Buffer> *data);
+  Status Create(const std::shared_ptr<Buffer> &metadata,
+                const size_t data_size,
+                ObjectID *object_id,
+                std::shared_ptr<Buffer> *data);
 
   /// Create and return a buffer in the object store that can be directly written
   /// into. After writing to the buffer, the caller must call `Seal()` to finalize
@@ -207,8 +210,10 @@ class CoreWorker {
   /// \param[in] object_id Object ID specified by the user.
   /// \param[out] data Buffer for the user to write the object into.
   /// \return Status.
-  Status Create(const std::shared_ptr<Buffer> &metadata, const size_t data_size,
-                const ObjectID &object_id, std::shared_ptr<Buffer> *data);
+  Status Create(const std::shared_ptr<Buffer> &metadata,
+                const size_t data_size,
+                const ObjectID &object_id,
+                std::shared_ptr<Buffer> *data);
 
   /// Finalize placing an object into the object store. This should be called after
   /// a corresponding `Create()` call and then writing into the returned buffer.
@@ -246,8 +251,10 @@ class CoreWorker {
   /// \param[in] timeout_ms Timeout in milliseconds, wait infinitely if it's negative.
   /// \param[out] results A bitset that indicates each object has appeared or not.
   /// \return Status.
-  Status Wait(const std::vector<ObjectID> &object_ids, const int num_objects,
-              const int64_t timeout_ms, std::vector<bool> *results);
+  Status Wait(const std::vector<ObjectID> &object_ids,
+              const int num_objects,
+              const int64_t timeout_ms,
+              std::vector<bool> *results);
 
   /// Delete a list of objects from the object store.
   ///
@@ -257,7 +264,8 @@ class CoreWorker {
   /// \param[in] delete_creating_tasks Whether also delete the tasks that
   /// created these objects.
   /// \return Status.
-  Status Delete(const std::vector<ObjectID> &object_ids, bool local_only,
+  Status Delete(const std::vector<ObjectID> &object_ids,
+                bool local_only,
                 bool delete_creating_tasks);
 
   /// Get a string describing object store memory usage for debugging purposes.
@@ -265,10 +273,8 @@ class CoreWorker {
   /// \return std::string The string describing memory usage.
   std::string MemoryUsageString();
 
-  ///
   /// Public methods related to task submission.
   ///
-
   /// Get the caller ID used to submit tasks from this worker to an actor.
   ///
   /// \return The caller ID. For non-actor tasks, this is the current task ID.
@@ -284,13 +290,14 @@ class CoreWorker {
   /// \param[in] task_options Options for this task.
   /// \param[out] return_ids Ids of the return objects.
   /// \return Status error if task submission fails, likely due to raylet failure.
-  Status SubmitTask(const RayFunction &function, const std::vector<TaskArg> &args,
-                    const TaskOptions &task_options, std::vector<ObjectID> *return_ids,
+  Status SubmitTask(const RayFunction &function,
+                    const std::vector<TaskArg> &args,
+                    const TaskOptions &task_options,
+                    std::vector<ObjectID> *return_ids,
                     int max_retries);
 
   /// Create an actor.
   ///
-  /// \param[in] caller_id ID of the task submitter.
   /// \param[in] function The remote function that generates the actor object.
   /// \param[in] args Arguments of this task.
   /// \param[in] actor_creation_options Options for this actor creation task.
@@ -298,14 +305,14 @@ class CoreWorker {
   /// \param[out] actor_id ID of the created actor. This can be used to submit
   /// tasks on the actor.
   /// \return Status error if actor creation fails, likely due to raylet failure.
-  Status CreateActor(const RayFunction &function, const std::vector<TaskArg> &args,
+  Status CreateActor(const RayFunction &function,
+                     const std::vector<TaskArg> &args,
                      const ActorCreationOptions &actor_creation_options,
                      ActorID *actor_id);
 
   /// Submit an actor task.
   ///
   /// \param[in] caller_id ID of the task submitter.
-  /// \param[in] actor_handle Handle to the actor.
   /// \param[in] function The remote function to execute.
   /// \param[in] args Arguments of this task.
   /// \param[in] task_options Options for this task.
@@ -313,7 +320,8 @@ class CoreWorker {
   /// \return Status error if the task is invalid or if the task submission
   /// failed. Tasks can be invalid for direct actor calls because not all tasks
   /// are currently supported.
-  Status SubmitActorTask(const ActorID &actor_id, const RayFunction &function,
+  Status SubmitActorTask(const ActorID &actor_id,
+                         const RayFunction &function,
                          const std::vector<TaskArg> &args,
                          const TaskOptions &task_options,
                          std::vector<ObjectID> *return_ids);
@@ -344,7 +352,7 @@ class CoreWorker {
 
   const ActorID &GetActorId() const { return actor_id_; }
 
-  // Get the resource IDs available to this worker (as assigned by the raylet).
+  /// Get the resource IDs available to this worker (as assigned by the raylet).
   const ResourceMappingType GetResourceIDs() const { return *resource_ids_; }
 
   /// Create a profile event with a reference to the core worker's profiler.
@@ -386,7 +394,8 @@ class CoreWorker {
                         rpc::SendReplyCallback send_reply_callback);
 
   /// Implements gRPC server handler.
-  void HandlePushTask(const rpc::PushTaskRequest &request, rpc::PushTaskReply *reply,
+  void HandlePushTask(const rpc::PushTaskRequest &request,
+                      rpc::PushTaskReply *reply,
                       rpc::SendReplyCallback send_reply_callback);
 
   /// Implements gRPC server handler.
@@ -400,11 +409,9 @@ class CoreWorker {
                              rpc::GetObjectStatusReply *reply,
                              rpc::SendReplyCallback send_reply_callback);
 
-  ///
   /// Public methods related to async actor call. This should only be used when
   /// the actor is (1) direct actor and (2) using asyncio mode.
   ///
-
   /// Block current fiber until event is triggered.
   void YieldCurrentFiber(FiberEvent &event);
 
@@ -422,10 +429,8 @@ class CoreWorker {
   /// Heartbeat for internal bookkeeping.
   void InternalHeartbeat();
 
-  ///
   /// Private methods related to task submission.
   ///
-
   /// Add task dependencies to the reference counter. This prevents the argument
   /// objects from early eviction, and also adds the return object.
   void PinObjectReferences(const TaskSpecification &task_spec,
@@ -443,10 +448,8 @@ class CoreWorker {
   /// to the same actor.
   bool AddActorHandle(std::unique_ptr<ActorHandle> actor_handle);
 
-  ///
   /// Private methods related to task execution. Should not be used by driver processes.
   ///
-
   /// Execute a task.
   ///
   /// \param spec[in] Task specification.
@@ -580,10 +583,8 @@ class CoreWorker {
   // Keeps track of object ID reference counts.
   std::shared_ptr<ReferenceCounter> reference_counter_;
 
-  ///
   /// Fields related to storing and retrieving objects.
   ///
-
   /// In-memory store for return objects.
   std::shared_ptr<CoreWorkerMemoryStore> memory_store_;
 
@@ -592,20 +593,18 @@ class CoreWorker {
 
   std::unique_ptr<FutureResolver> future_resolver_;
 
-  ///
   /// Fields related to task submission.
   ///
-
-  // Tracks the currently pending tasks.
+  /// Tracks the currently pending tasks.
   std::shared_ptr<TaskManager> task_manager_;
 
-  // Interface for publishing actor creation.
+  /// Interface for publishing actor creation.
   std::shared_ptr<ActorManager> actor_manager_;
 
-  // Interface to submit tasks directly to other actors.
+  /// Interface to submit tasks directly to other actors.
   std::unique_ptr<CoreWorkerDirectActorTaskSubmitter> direct_actor_submitter_;
 
-  // Interface to submit non-actor tasks directly to leased workers.
+  /// Interface to submit non-actor tasks directly to leased workers.
   std::unique_ptr<CoreWorkerDirectTaskSubmitter> direct_task_submitter_;
 
   /// The `actor_handles_` field could be mutated concurrently due to multi-threading, we
@@ -619,10 +618,8 @@ class CoreWorker {
   /// Resolve local and remote dependencies for actor creation.
   std::unique_ptr<LocalDependencyResolver> resolver_;
 
-  ///
   /// Fields related to task execution.
   ///
-
   /// Our actor ID. If this is nil, then we execute only stateless tasks.
   ActorID actor_id_;
 

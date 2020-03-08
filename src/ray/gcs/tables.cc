@@ -141,22 +141,22 @@ Status Log<ID, Data>::Subscribe(const JobID &job_id, const ClientID &client_id,
 template <typename ID, typename Data>
 Status Log<ID, Data>::Subscribe(const JobID &job_id,
                                 const ClientID &client_id,
-                                const NotificationCallback &subscribe,
-                                const SubscriptionCallback &done) {
+                                const NotificationCallback &subscribe_callback,
+                                const SubscriptionCallback &done_callback) {
   RAY_CHECK(subscribe_callback_index_ == -1)
       << "Client called Subscribe twice on the same table";
-  auto callback = [this, subscribe, done](std::shared_ptr<CallbackReply> reply) {
+  auto callback = [this, subscribe_callback, done_callback](std::shared_ptr<CallbackReply> reply) {
     const auto data = reply->ReadAsPubsubData();
 
     if (data.empty()) {
       // No notification data is provided. This is the callback for the
       // initial subscription request.
-      if (done != nullptr) {
-        done(client_);
+      if (done_callback != nullptr) {
+        done_callback(client_);
       }
     } else {
       // Data is provided. This is the callback for a message.
-      if (subscribe != nullptr) {
+      if (subscribe_callback != nullptr) {
         // Parse the notification.
         GcsEntry gcs_entry;
         gcs_entry.ParseFromString(data);
@@ -167,7 +167,7 @@ Status Log<ID, Data>::Subscribe(const JobID &job_id,
           result.ParseFromString(gcs_entry.entries(i));
           results.emplace_back(std::move(result));
         }
-        subscribe(client_, id, gcs_entry.change_mode(), results);
+        subscribe_callback(client_, id, gcs_entry.change_mode(), results);
       }
     }
   };

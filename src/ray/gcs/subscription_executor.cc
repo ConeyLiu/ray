@@ -7,19 +7,20 @@ namespace gcs {
 template <typename ID, typename Data, typename Table>
 Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribeAll(
     const ClientID &client_id,
-    const SubscribeCallback<ID, Data> &subscribe,
+    const SubscribeCallback<ID, Data> &subscribe_all_callback,
     const StatusCallback &done) {
   // TODO(micafan) Optimize the lock when necessary.
   // Consider avoiding locking in single-threaded processes.
   std::unique_lock<std::mutex> lock(mutex_);
 
+  // if we already subscribe all, we can't subscribe again or subscribe given object id.
   if (subscribe_all_callback_ != nullptr) {
     RAY_LOG(DEBUG) << "Duplicate subscription! Already subscribed to all elements.";
     return Status::Invalid("Duplicate subscription!");
   }
 
   if (registration_status_ != RegistrationStatus::kNotRegistered) {
-    if (subscribe != nullptr) {
+    if (subscribe_all_callback != nullptr) {
       RAY_LOG(DEBUG) << "Duplicate subscription! Already subscribed to specific elements"
                         ", can't subscribe to all elements.";
       return Status::Invalid("Duplicate subscription!");
@@ -89,10 +90,13 @@ Status SubscriptionExecutor<ID, Data, Table>::AsyncSubscribeAll(
     }
   };
 
+  // if client_id is Nil: we subscribe the channel_str
+  // if the client_id is not Nil: we subscribe the channel_str + client_id and need
+  // to request notification for special ID
   Status status = table_.Subscribe(JobID::Nil(), client_id, on_subscribe, on_done);
   if (status.ok()) {
     registration_status_ = RegistrationStatus::kRegistering;
-    subscribe_all_callback_ = subscribe;
+    subscribe_all_callback_ = subscribe_all_callback;
   }
 
   return status;

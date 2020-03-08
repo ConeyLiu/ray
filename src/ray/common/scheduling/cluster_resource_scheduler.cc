@@ -1,7 +1,7 @@
 #include "cluster_resource_scheduler.h"
 
 #pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnusedValue"
+// #pragma ide diagnostic ignored "UnusedValue"
 std::string NodeResources::DebugString() {
   std::stringstream buffer;
   buffer << "  node predefined resources {";

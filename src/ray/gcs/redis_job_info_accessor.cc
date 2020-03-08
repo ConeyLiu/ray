@@ -17,8 +17,11 @@ Status RedisJobInfoAccessor::AsyncAdd(const std::shared_ptr<JobTableData> &data_
 Status RedisJobInfoAccessor::AsyncMarkFinished(const JobID &job_id,
                                                const StatusCallback &callback) {
   std::shared_ptr<JobTableData> data_ptr =
-      CreateJobTableData(job_id, /*is_dead*/ true, /*time_stamp*/ std::time(nullptr),
-                         /*node_manager_address*/ "", /*driver_pid*/ -1);
+      CreateJobTableData(job_id,
+                         /*is_dead*/ true,
+                         /*time_stamp*/ std::time(nullptr),
+                         /*node_manager_address*/ "",
+                         /*driver_pid*/ -1);
   return DoAsyncAppend(data_ptr, callback);
 }
 
@@ -26,8 +29,11 @@ Status RedisJobInfoAccessor::DoAsyncAppend(const std::shared_ptr<JobTableData> &
                                            const StatusCallback &callback) {
   JobTable::WriteCallback on_done = nullptr;
   if (callback != nullptr) {
-    on_done = [callback](RedisGcsClient *client, const JobID &job_id,
-                         const JobTableData &data) { callback(Status::OK()); };
+    on_done = [callback](RedisGcsClient *client,
+                         const JobID &job_id,
+                         const JobTableData &data) {
+        callback(Status::OK());
+    };
   }
 
   JobID job_id = JobID::FromBinary(data_ptr->job_id());
@@ -35,11 +41,12 @@ Status RedisJobInfoAccessor::DoAsyncAppend(const std::shared_ptr<JobTableData> &
 }
 
 Status RedisJobInfoAccessor::AsyncSubscribeToFinishedJobs(
-    const SubscribeCallback<JobID, JobTableData> &subscribe, const StatusCallback &done) {
-  RAY_CHECK(subscribe != nullptr);
-  auto on_subscribe = [subscribe](const JobID &job_id, const JobTableData &job_data) {
+    const SubscribeCallback<JobID, JobTableData> &subscribe_callback,
+    const StatusCallback &done) {
+  RAY_CHECK(subscribe_callback != nullptr);
+  auto on_subscribe = [subscribe_callback](const JobID &job_id, const JobTableData &job_data) {
     if (job_data.is_dead()) {
-      subscribe(job_id, job_data);
+        subscribe_callback(job_id, job_data);
     }
   };
   return job_sub_executor_.AsyncSubscribeAll(ClientID::Nil(), on_subscribe, done);

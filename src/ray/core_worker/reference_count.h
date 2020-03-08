@@ -100,6 +100,7 @@ class ReferenceCounter {
         : dependencies(std::move(deps)),
           owned_by_us(true),
           owner({owner_id, owner_address}) {}
+
     /// Constructor for a reference that was given to us.
     Reference(const TaskID &owner_id,
               const rpc::Address &owner_address)

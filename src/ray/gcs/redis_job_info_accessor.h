@@ -42,7 +42,7 @@ class RedisJobInfoAccessor : public JobInfoAccessor {
 
   RedisGcsClient *client_impl_{nullptr};
 
-  typedef SubscriptionExecutor<JobID, JobTableData, JobTable> JobSubscriptionExecutor;
+  using JobSubscriptionExecutor = SubscriptionExecutor<JobID, JobTableData, JobTable> ;
   JobSubscriptionExecutor job_sub_executor_;
 };
 

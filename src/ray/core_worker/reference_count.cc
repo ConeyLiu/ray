@@ -1,5 +1,7 @@
 #include "ray/core_worker/reference_count.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedValue"
 namespace ray {
 
 void ReferenceCounter::AddBorrowedObject(const ObjectID &object_id,
@@ -153,3 +155,5 @@ void ReferenceCounter::LogDebugString() const {
 }
 
 }  // namespace ray
+
+#pragma clang diagnostic pop

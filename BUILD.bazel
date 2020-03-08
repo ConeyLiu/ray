@@ -1025,6 +1025,7 @@ genrule(
         "redis-cli",
     ],
     cmd = """
+        export http_proxy=http://127.0.0.1:49971 && export https_proxy=http://127.0.0.1:49971 &&
         set -x &&
         curl -sL \"https://github.com/antirez/redis/archive/5.0.3.tar.gz\" | tar -xzf - --strip-components=1 -C . &&
         make &&
