@@ -10,6 +10,7 @@
 #include "ray/core_worker/context.h"
 #include "ray/core_worker/future_resolver.h"
 #include "ray/core_worker/profiling.h"
+#include "ray/core_worker/profiling_util.h"
 #include "ray/core_worker/reference_count.h"
 #include "ray/core_worker/store_provider/memory_store/memory_store.h"
 #include "ray/core_worker/store_provider/plasma_store_provider.h"

@@ -57,6 +57,8 @@ void InlineDependencies(
 
 void LocalDependencyResolver::ResolveDependencies(TaskSpecification &task,
                                                   std::function<void()> on_complete) {
+  auto dependencies_event =
+      worker::ProfilingUtil::CreateProfileEvent("task.submit_task.depencies_event")
   absl::flat_hash_map<ObjectID, std::shared_ptr<RayObject>> local_dependencies;
   for (size_t i = 0; i < task.NumArgs(); i++) {
     auto count = task.ArgIdCount(i);
@@ -73,6 +75,9 @@ void LocalDependencyResolver::ResolveDependencies(TaskSpecification &task,
     return;
   }
 
+  dependencies_event.reset();
+  auto get_dependencies_event =
+      worker::ProfilingUtil::CreateProfileEvent("task.submit_task.get_depencies_event")
   // This is deleted when the last dependency fetch callback finishes.
   std::shared_ptr<TaskState> state =
       std::make_shared<TaskState>(task, std::move(local_dependencies));

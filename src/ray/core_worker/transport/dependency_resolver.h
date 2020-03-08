@@ -5,6 +5,7 @@
 
 #include "ray/common/id.h"
 #include "ray/common/task/task_spec.h"
+#include "ray/core_worker/profiling_util.h"
 #include "ray/core_worker/store_provider/memory_store/memory_store.h"
 #include "ray/core_worker/task_manager.h"
 
@@ -43,6 +44,8 @@ class LocalDependencyResolver {
 
   /// Protects against concurrent access to internal state.
   absl::Mutex mu_;
+
+  std::shared_ptr<worker::Profiler> profiler_;
 };
 
 }  // namespace ray

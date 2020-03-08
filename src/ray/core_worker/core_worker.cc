@@ -109,6 +109,8 @@ CoreWorker::CoreWorker(const WorkerType worker_type, const Language language,
   profiler_ = std::make_shared<worker::Profiler>(worker_context_, node_ip_address,
                                                  io_service_, gcs_client_);
 
+  worker::ProfilingUtil::initialize(profiler_)
+
   // Initialize task receivers.
   if (worker_type_ == WorkerType::WORKER) {
     RAY_CHECK(task_execution_callback_ != nullptr);
@@ -668,9 +670,7 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
   TaskSpecification task_spec = builder.Build();
   event.reset();
   if (task_options.is_direct_call) {
-    auto tm_event = CreateProfileEvent("task.submit_task.add_pending_task");
     task_manager_->AddPendingTask(GetCallerId(), rpc_address_, task_spec, max_retries);
-    tm_event.reset();
     return direct_task_submitter_->SubmitTask(task_spec);
   } else {
     return local_raylet_client_->SubmitTask(task_spec);
