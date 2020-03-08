@@ -656,6 +656,7 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
                             worker_context_.GetCurrentTaskID(), next_task_index);
 
   const std::unordered_map<std::string, double> required_resources;
+  auto event = CreateProfileEvent("buildSpec");
   // TODO(ekl) offload task building onto a thread pool for performance
   BuildCommonTaskSpec(
       builder, worker_context_.GetCurrentJobID(), task_id,
@@ -665,6 +666,7 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
       task_options.is_direct_call ? TaskTransportType::DIRECT : TaskTransportType::RAYLET,
       return_ids);
   TaskSpecification task_spec = builder.Build();
+  event.reset();
   if (task_options.is_direct_call) {
     task_manager_->AddPendingTask(GetCallerId(), rpc_address_, task_spec, max_retries);
     return direct_task_submitter_->SubmitTask(task_spec);
