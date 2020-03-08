@@ -109,7 +109,7 @@ CoreWorker::CoreWorker(const WorkerType worker_type, const Language language,
   profiler_ = std::make_shared<worker::Profiler>(worker_context_, node_ip_address,
                                                  io_service_, gcs_client_);
 
-  worker::ProfilingUtil::initialize(profiler_)
+  worker::ProfilingUtil::initialize(profiler_);
 
   // Initialize task receivers.
   if (worker_type_ == WorkerType::WORKER) {
