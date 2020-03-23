@@ -41,8 +41,8 @@ void BuildCommonTaskSpec(
   builder.SetCommonTaskSpec(task_id, function.GetLanguage(),
                             function.GetFunctionDescriptor(), job_id, current_task_id,
                             task_index, caller_id, address, num_returns,
-                            required_resources, extra_envs,
-                            required_placement_resources);
+                            required_resources, required_placement_resources,
+                            extra_envs);
   // Set task arguments.
   for (const auto &arg : args) {
     if (arg.IsPassedByReference()) {
@@ -804,8 +804,8 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
                               const TaskOptions &task_options,
                               std::vector<ObjectID> *return_ids,
                               int max_retries,
-                              const std::unordered_map<std::string, std::string>
-                                 &extra_envs) {
+                              const std::unordered_map<std::string,
+                                                       std::string> &extra_envs) {
   TaskSpecBuilder builder;
   const int next_task_index = worker_context_.GetNextTaskIndex();
   const auto task_id =
@@ -830,9 +830,9 @@ Status CoreWorker::CreateActor(const RayFunction &function,
                                const std::vector<TaskArg> &args,
                                const ActorCreationOptions &actor_creation_options,
                                const std::string &extension_data,
-                               ActorID *return_actor_id,
-                               const std::unordered_map<std::string, std::string>
-                                   &extra_envs) {
+                               const std::unordered_map<std::string,
+                                                        std::string> &extra_envs,
+                               ActorID *return_actor_id) {
   const int next_task_index = worker_context_.GetNextTaskIndex();
   const ActorID actor_id =
       ActorID::Of(worker_context_.GetCurrentJobID(), worker_context_.GetCurrentTaskID(),
@@ -885,10 +885,11 @@ Status CoreWorker::SubmitActorTask(const ActorID &actor_id, const RayFunction &f
       worker_context_.GetCurrentJobID(), worker_context_.GetCurrentTaskID(),
       next_task_index, actor_handle->GetActorID());
   const std::unordered_map<std::string, double> required_resources;
+  const std::unordered_map<std::string, std::string> extra_envs;
   BuildCommonTaskSpec(builder, actor_handle->CreationJobID(), actor_task_id,
                       worker_context_.GetCurrentTaskID(), next_task_index, GetCallerId(),
                       rpc_address_, function, args, num_returns, task_options.resources,
-                      required_resources, return_ids);
+                      required_resources, extra_envs, return_ids);
 
   const ObjectID new_cursor = return_ids->back();
   actor_handle->SetActorTaskSpec(builder, new_cursor);
@@ -1142,7 +1143,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
 
   status = task_execution_callback_(
       task_type, func, task_spec.GetRequiredResources().GetResourceMap(), args,
-      arg_reference_ids, return_ids, return_objects, task_spec.GetExtraEnvs(),
+      arg_reference_ids, task_spec.GetExtraEnvs(), return_ids, return_objects,
       worker_context_.GetWorkerID());
 
   absl::optional<rpc::Address> caller_address(

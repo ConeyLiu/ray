@@ -77,9 +77,11 @@ ActorID CreateActorHelper(CoreWorker &worker,
                                      /*is_asyncio*/ false};
 
   // Create an actor.
+  const std::unordered_map<std::string, std::string> extra_envs;
   ActorID actor_id;
   RAY_CHECK_OK(
-      worker.CreateActor(func, args, actor_options, /*extension_data*/ "", &actor_id));
+      worker.CreateActor(func, args, actor_options, /*extension_data*/ "", extra_envs,
+                         &actor_id));
   return actor_id;
 }
 
@@ -345,8 +347,10 @@ void CoreWorkerTest::TestNormalTask(std::unordered_map<std::string, double> &res
                                                   "MergeInputArgsAsOutput", "", "", ""));
       TaskOptions options;
       std::vector<ObjectID> return_ids;
+      const std::unordered_map<std::string, std::string> extra_envs;
       RAY_CHECK_OK(
-          driver.SubmitTask(func, args, options, &return_ids, /*max_retries=*/0));
+          driver.SubmitTask(func, args, options, &return_ids, /*max_retries=*/0,
+                            extra_envs));
 
       ASSERT_EQ(return_ids.size(), 1);
 

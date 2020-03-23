@@ -314,7 +314,7 @@ cdef deserialize_args(
     return ray.signature.recover_args(args)
 
 
-cdef prepare_extra_envs(
+cdef void prepare_extra_envs(
         dict extra_envs,
         unordered_map[c_string, c_string] &c_extra_envs):
 
@@ -339,10 +339,11 @@ cdef dict deserialize_extra_envs(
         return {}
     
     extra_envs = {}
-    while iterator != resource_mapping.end():
-            key = decode(dereference(iterator).first)
-            value = decode(dereference(iterator).second)
-            extra_envs[key] = value
+    while iterator != c_extra_envs.end():
+        key = decode(dereference(iterator).first)
+        value = decode(dereference(iterator).second)
+        extra_envs[key] = value
+        postincrement(iterator)
     
     return extra_envs
         
@@ -353,9 +354,9 @@ cdef execute_task(
         const unordered_map[c_string, double] &c_resources,
         const c_vector[shared_ptr[CRayObject]] &c_args,
         const c_vector[CObjectID] &c_arg_reference_ids,
-        const c_vector[CObjectID] &c_return_ids,
-        c_vector[shared_ptr[CRayObject]] *returns,
-        const unordered_map[c_string, c_string] &c_extra_envs):
+        const unordered_map[c_string, c_string] &c_extra_envs,
+        const c_vector[CObjectID] &c_return_ids,,
+        c_vector[shared_ptr[CRayObject]] *returns):
 
     worker = ray.worker.global_worker
     manager = worker.function_actor_manager
@@ -536,9 +537,9 @@ cdef CRayStatus task_execution_handler(
         const unordered_map[c_string, double] &c_resources,
         const c_vector[shared_ptr[CRayObject]] &c_args,
         const c_vector[CObjectID] &c_arg_reference_ids,
+        const unordered_map[c_string, c_string] &c_extra_envs,
         const c_vector[CObjectID] &c_return_ids,
         c_vector[shared_ptr[CRayObject]] *returns,
-        const unordered_map[c_string, c_string] &c_extra_envs,
         const CWorkerID &c_worker_id) nogil:
 
     with gil:
@@ -547,7 +548,7 @@ cdef CRayStatus task_execution_handler(
                 # The call to execute_task should never raise an exception. If
                 # it does, that indicates that there was an internal error.
                 execute_task(task_type, ray_function, c_resources, c_args,
-                             c_arg_reference_ids, c_return_ids, c_extra_envs,
+                             c_arg_reference_ids, c_extra_envs, c_return_ids,
                              returns)
             except Exception:
                 traceback_str = traceback.format_exc() + (
@@ -862,7 +863,7 @@ cdef class CoreWorker:
                     int num_return_vals,
                     resources,
                     int max_retries,
-                    dict extra_envs):
+                    extra_envs):
         cdef:
             unordered_map[c_string, double] c_resources
             CTaskOptions task_options
@@ -898,7 +899,7 @@ cdef class CoreWorker:
                      c_bool is_detached,
                      c_bool is_asyncio,
                      c_string extension_data,
-                     dict extra_data):
+                     extra_envs):
         cdef:
             CRayFunction ray_function
             c_vector[CTaskArg] args_vector
@@ -923,8 +924,7 @@ cdef class CoreWorker:
                         max_reconstructions, max_concurrency,
                         c_resources, c_placement_resources,
                         dynamic_worker_options, is_detached, is_asyncio),
-                    extension_data,
-                    &c_actor_id, c_extra_envs))
+                    extension_data, c_extra_envs, &c_actor_id))
 
             return ActorID(c_actor_id.Binary())
 
