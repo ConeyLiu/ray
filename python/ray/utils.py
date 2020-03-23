@@ -305,7 +305,7 @@ def set_cuda_visible_devices(gpu_ids):
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in gpu_ids])
     last_set_gpu_ids = gpu_ids
 
-def prepare_envs(extra_envs, gpu_ids):
+def prepare_envs(extra_envs):
     global previous_extra_envs
     if extra_envs:
         previous_extra_envs = {}
@@ -316,8 +316,6 @@ def prepare_envs(extra_envs, gpu_ids):
                 continue
             previous_extra_envs[k] = os.environ.get(k, None)
             os.environ[k] = v
-
-    set_cuda_visible_devices(gpu_ids)
 
 
 def reset_envs():

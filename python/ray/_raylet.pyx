@@ -319,7 +319,7 @@ cdef prepare_extra_envs(
         unordered_map[c_string, c_string] &c_extra_envs):
 
     if not extra_envs:
-        return ""
+        return
 
     if "CUDA_VISIBLE_DEVICES" in extra_envs:
             raise ValueError(
@@ -368,8 +368,10 @@ cdef execute_task(
         CFiberEvent fiber_event
         dict extra_envs = deserialize_extra_envs(c_extra_envs)
 
-    # Set the extra envs and restrict the GPUs available to this task.
-    ray.utils.prepare_envs(extra_envs, ray.get_gpu_ids())
+    # Automatically restrict the GPUs available to this task.
+    ray.utils.set_cuda_visible_devices(ray.get_gpu_ids())
+    # Set the extra envs
+    ray.utils.prepare_envs(extra_envs)
 
     function_descriptor = CFunctionDescriptorToPython(
         ray_function.GetFunctionDescriptor())

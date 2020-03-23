@@ -518,6 +518,8 @@ class ActorClass:
         if worker.mode == ray.LOCAL_MODE:
             assert not meta.is_cross_language, \
                 "Cross language ActorClass cannot be executed locally."
+            assert not extra_envs, \
+                    "Set extra envs is not allowed for locally mode."
             actor_id = ActorID.from_random()
             worker.actors[actor_id] = meta.modified_class(
                 *copy.deepcopy(args), **copy.deepcopy(kwargs))
