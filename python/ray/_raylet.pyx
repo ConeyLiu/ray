@@ -331,15 +331,15 @@ cdef void prepare_extra_envs(
 
 
 cdef dict deserialize_extra_envs(
-        unordered_map[c_string, c_string] &c_extra_envs):
+        const unordered_map[c_string, c_string] &c_extra_envs):
     cdef:
-        unordered_map[c_string, c_string].iterator iterator =\
-            c_extra_envs.begin()
-    if iterator == c_extra_envs.end():
+        unordered_map[c_string, c_string].const_iterator iterator =\
+            c_extra_envs.const_begin()
+    if iterator == c_extra_envs.const_end():
         return {}
     
     extra_envs = {}
-    while iterator != c_extra_envs.end():
+    while iterator != c_extra_envs.const_end():
         key = decode(dereference(iterator).first)
         value = decode(dereference(iterator).second)
         extra_envs[key] = value
@@ -355,7 +355,7 @@ cdef execute_task(
         const c_vector[shared_ptr[CRayObject]] &c_args,
         const c_vector[CObjectID] &c_arg_reference_ids,
         const unordered_map[c_string, c_string] &c_extra_envs,
-        const c_vector[CObjectID] &c_return_ids,,
+        const c_vector[CObjectID] &c_return_ids,
         c_vector[shared_ptr[CRayObject]] *returns):
 
     worker = ray.worker.global_worker
