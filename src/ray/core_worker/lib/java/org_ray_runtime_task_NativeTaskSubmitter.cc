@@ -153,7 +153,7 @@ Java_org_ray_runtime_task_NativeTaskSubmitter_nativeCreateActor(
   auto task_args = ToTaskArgs(env, args);
   auto actor_creation_options = ToActorCreationOptions(env, actorCreationOptions);
 
-  const std::unordered_map<std::string, std::string> exra_envs;
+  const std::unordered_map<std::string, std::string> extra_envs;
   ray::ActorID actor_id;
   auto status = GetCoreWorker(nativeCoreWorkerPointer)
                     .CreateActor(ray_function, task_args, actor_creation_options,
