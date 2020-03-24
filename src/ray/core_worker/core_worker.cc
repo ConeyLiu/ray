@@ -799,13 +799,10 @@ Status CoreWorker::SetResource(const std::string &resource_name, const double ca
   return local_raylet_client_->SetResource(resource_name, capacity, client_id);
 }
 
-Status CoreWorker::SubmitTask(const RayFunction &function,
-                              const std::vector<TaskArg> &args,
-                              const TaskOptions &task_options,
-                              std::vector<ObjectID> *return_ids,
-                              int max_retries,
-                              const std::unordered_map<std::string,
-                                                       std::string> &extra_envs) {
+Status CoreWorker::SubmitTask(
+    const RayFunction &function, const std::vector<TaskArg> &args,
+    const TaskOptions &task_options, std::vector<ObjectID> *return_ids, int max_retries,
+    const std::unordered_map<std::string, std::string> &extra_envs) {
   TaskSpecBuilder builder;
   const int next_task_index = worker_context_.GetNextTaskIndex();
   const auto task_id =
@@ -817,8 +814,7 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
   BuildCommonTaskSpec(builder, worker_context_.GetCurrentJobID(), task_id,
                       worker_context_.GetCurrentTaskID(), next_task_index, GetCallerId(),
                       rpc_address_, function, args, task_options.num_returns,
-                      task_options.resources, required_resources, extra_envs,
-                      return_ids);
+                      task_options.resources, required_resources, extra_envs, return_ids);
 
   TaskSpecification task_spec = builder.Build();
   task_manager_->AddPendingTask(GetCallerId(), rpc_address_, task_spec, CurrentCallSite(),
@@ -826,13 +822,11 @@ Status CoreWorker::SubmitTask(const RayFunction &function,
   return direct_task_submitter_->SubmitTask(task_spec);
 }
 
-Status CoreWorker::CreateActor(const RayFunction &function,
-                               const std::vector<TaskArg> &args,
-                               const ActorCreationOptions &actor_creation_options,
-                               const std::string &extension_data,
-                               const std::unordered_map<std::string,
-                                                        std::string> &extra_envs,
-                               ActorID *return_actor_id) {
+Status CoreWorker::CreateActor(
+    const RayFunction &function, const std::vector<TaskArg> &args,
+    const ActorCreationOptions &actor_creation_options, const std::string &extension_data,
+    const std::unordered_map<std::string, std::string> &extra_envs,
+    ActorID *return_actor_id) {
   const int next_task_index = worker_context_.GetNextTaskIndex();
   const ActorID actor_id =
       ActorID::Of(worker_context_.GetCurrentJobID(), worker_context_.GetCurrentTaskID(),

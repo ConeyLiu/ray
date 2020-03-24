@@ -322,8 +322,8 @@ cdef void prepare_extra_envs(
         return
 
     if "CUDA_VISIBLE_DEVICES" in extra_envs:
-            raise ValueError(
-                '"CUDA_VISIBLE_DEVICES" should not be set by user.')
+        raise ValueError(
+            '"CUDA_VISIBLE_DEVICES" should not be set by user.')
     for key, value in extra_envs.items():
         if not (isinstance(value, str) and isinstance(value, str)):
             raise ValueError("Extra envs key and value must be str.")
@@ -337,16 +337,16 @@ cdef dict deserialize_extra_envs(
             c_extra_envs.const_begin()
     if iterator == c_extra_envs.const_end():
         return {}
-    
+
     extra_envs = {}
     while iterator != c_extra_envs.const_end():
         key = decode(dereference(iterator).first)
         value = decode(dereference(iterator).second)
         extra_envs[key] = value
         postincrement(iterator)
-    
+
     return extra_envs
-        
+
 
 cdef execute_task(
         CTaskType task_type,
@@ -401,6 +401,7 @@ cdef execute_task(
         title = "ray::{}()".format(function_name)
         next_title = "ray::IDLE"
         def function_executor(*arguments, **kwarguments):
+
             try:
                 return execution_info.function(*arguments, **kwarguments)
             finally:
