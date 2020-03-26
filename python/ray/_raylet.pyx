@@ -404,6 +404,8 @@ cdef execute_task(
 
             try:
                 return execution_info.function(*arguments, **kwarguments)
+            except Exception:
+                 raise
             finally:
                 # reset the env setting for normal tasks
                 ray.utils.reset_envs()
