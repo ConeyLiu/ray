@@ -354,11 +354,10 @@ class ActorClass:
         return self
 
     @classmethod
-    def _ray_from_function_descriptor(cls, language,
-                                      actor_creation_function_descriptor,
-                                      max_reconstructions, num_cpus, num_gpus,
-                                      memory, object_store_memory, resources,
-                                      extra_envs):
+    def _ray_from_function_descriptor(
+            cls, language, actor_creation_function_descriptor,
+            max_reconstructions, num_cpus, num_gpus, memory,
+            object_store_memory, resources, extra_envs):
         self = ActorClass.__new__(ActorClass)
 
         self.__ray_metadata__ = ActorClassMetadata(

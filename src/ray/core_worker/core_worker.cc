@@ -41,8 +41,7 @@ void BuildCommonTaskSpec(
   builder.SetCommonTaskSpec(task_id, function.GetLanguage(),
                             function.GetFunctionDescriptor(), job_id, current_task_id,
                             task_index, caller_id, address, num_returns,
-                            required_resources, required_placement_resources,
-                            extra_envs);
+                            required_resources, required_placement_resources, extra_envs);
   // Set task arguments.
   for (const auto &arg : args) {
     if (arg.IsPassedByReference()) {
