@@ -10,9 +10,9 @@ def test_normal_remote_task():
     def f1(key):
         return os.environ.get(key, "error")
 
-    @ray.remote(extra_envs={"key2": "value2"})
-    def f2():
-        return os.environ.get("key2", "error")
+    @ray.remote(num_cpus=1, extra_envs={"key2": "value2"})
+    def f2(key):
+        return os.environ.get(key, "error")
 
     ray.init(num_cpus=1)
 
@@ -22,7 +22,8 @@ def test_normal_remote_task():
     assert v == "value3"
     v = ray.get(f1.options(extra_envs={}).remote("key1"))
     assert v == "error"
-    assert ray.get(f2.remote()) == "value2"
+    assert ray.get(f2.remote("key2")) == "value2"
+    assert ray.get(f2.remote("key1")) == "error"
 
     with pytest.raises(ValueError) as excinfo:
         f1.options(extra_envs={"CUDA_VISIBLE_DEVICES": "1"}).remote()
