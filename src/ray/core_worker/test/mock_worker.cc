@@ -47,7 +47,7 @@ class MockWorker {
                      const std::unordered_map<std::string, double> &required_resources,
                      const std::vector<std::shared_ptr<RayObject>> &args,
                      const std::vector<ObjectID> &arg_reference_ids,
-                     const std::vector<std::string, std::string> &extra_envs,
+                     const std::unordered_map<std::string, std::string> &extra_envs,
                      const std::vector<ObjectID> &return_ids,
                      std::vector<std::shared_ptr<RayObject>> *results) {
     // Note that this doesn't include dummy object id.
