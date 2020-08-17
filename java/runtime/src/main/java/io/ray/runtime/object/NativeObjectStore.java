@@ -98,4 +98,8 @@ public class NativeObjectStore extends ObjectStore {
   private static native void nativeRemoveLocalReference(byte[] workerId, byte[] objectId);
 
   private static native Map<byte[], long[]> nativeGetAllReferenceCounts();
+
+  public static native void nativePromoteObjectToPlasma(byte[] objectId);
+
+  public static native byte[] nativeGetOwnershipInfo(byte[] objectId);
 }

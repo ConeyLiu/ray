@@ -171,6 +171,26 @@ Java_io_ray_runtime_object_NativeObjectStore_nativeGetAllReferenceCounts(JNIEnv 
       });
 }
 
+JNIEXPORT void JNICALL
+Java_io_ray_runtime_object_NativeObjectStore_nativePromoteObjectToPlasma(JNIEnv *env, jclass,
+        jbyteArray objectId) {
+    auto object_id = JavaByteArrayToId<ray::ObjectID>(env, objectId);
+    ray::CoreWorkerProcess::GetCoreWorker().PromoteObjectToPlasma(object_id);
+}
+
+JNIEXPORT jbyteArray JNICALL
+JAVA_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *env, jclass,
+        jbyteArray  objectId) {
+    auto object_id = JavaByteArrayToId<ray::ObjectID>(env, objectId);
+    ray::rpc::Address address;
+    ray::CoreWorkerProcess::GetCoreWorker().GetOwnershipInfo(object_id, &address);
+    auto address_str = address.SerializeAsString();
+    jbyteArray arr = env->NewByteArray(address_str.length());
+    env->SetByteArrayRegion(
+      arr, 0, address_str.length(), reinterpret_cast<const jbyte *>(address_str.c_str()));
+    return arr;
+}
+
 #ifdef __cplusplus
 }
 #endif

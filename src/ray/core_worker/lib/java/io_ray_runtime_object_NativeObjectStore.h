@@ -94,6 +94,15 @@ JNIEXPORT jobject JNICALL
 Java_io_ray_runtime_object_NativeObjectStore_nativeGetAllReferenceCounts(JNIEnv *,
                                                                          jclass);
 
+
+JNIEXPORT void JNICALL
+Java_io_ray_runtime_object_NativeObjectStore_nativePromoteObjectToPlasma(JNIEnv *, jclass,
+                                                                         jbyteArray);
+
+JNIEXPORT jbyteArray JNICALL
+JAVA_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *, jclass,
+                                                                    jbyteArray);
+
 #ifdef __cplusplus
 }
 #endif
