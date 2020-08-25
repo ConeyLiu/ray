@@ -95,12 +95,23 @@ Java_io_ray_runtime_object_NativeObjectStore_nativeGetAllReferenceCounts(JNIEnv 
                                                                          jclass);
 
 
+
+/*
+ * Class:     io_ray_runtime_object_NativeObjectStore
+ * Method:    nativePromoteObjectToPlasma
+ * Signature: ([B)V
+ */
 JNIEXPORT void JNICALL
 Java_io_ray_runtime_object_NativeObjectStore_nativePromoteObjectToPlasma(JNIEnv *, jclass,
                                                                          jbyteArray);
 
+/*
+ * Class:     io_ray_runtime_object_NativeObjectStore
+ * Method:    nativeGetOwnershipInfo
+ * Signature: ([B)[B
+ */
 JNIEXPORT jbyteArray JNICALL
-JAVA_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *, jclass,
+Java_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *, jclass,
                                                                     jbyteArray);
 
 #ifdef __cplusplus

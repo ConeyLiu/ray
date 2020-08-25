@@ -179,8 +179,8 @@ Java_io_ray_runtime_object_NativeObjectStore_nativePromoteObjectToPlasma(JNIEnv 
 }
 
 JNIEXPORT jbyteArray JNICALL
-JAVA_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *env, jclass,
-        jbyteArray  objectId) {
+Java_io_ray_runtime_object_NativeObjectStore_nativeGetOwnershipInfo(JNIEnv *env, jclass,
+        jbyteArray objectId) {
     auto object_id = JavaByteArrayToId<ray::ObjectID>(env, objectId);
     ray::rpc::Address address;
     ray::CoreWorkerProcess::GetCoreWorker().GetOwnershipInfo(object_id, &address);
