@@ -7,10 +7,10 @@ from pandas import DataFrame
 
 import ray.util.iter as para_iter
 from .dataset import MLDataset
-from .interface import _SourceShard
+from .interface import SourceShard
 
 
-class ParquetSourceShard(_SourceShard):
+class ParquetSourceShard(SourceShard):
     def __init__(self, data_pieces: List[pq.ParquetDatasetPiece],
                  columns: Optional[List[str]],
                  partitions: Optional[pq.ParquetPartitions], shard_id: int):
@@ -25,6 +25,10 @@ class ParquetSourceShard(_SourceShard):
     @property
     def shard_id(self) -> int:
         return self._shard_id
+
+    @property
+    def num_records(self) -> int:
+        pass
 
     def __iter__(self) -> Iterable[DataFrame]:
         for piece in self._data_pieces:
@@ -76,7 +80,9 @@ def read_parquet(paths: Union[str, List[str]],
     if rowgroup_split:
         # split base on rowgroup
         for piece in pieces:
-            num_row_groups = piece.get_metadata().to_dict()["num_row_groups"]
+            metadata = piece.get_metadata().to_dict()
+            num_row_groups = metadata["num_row_groups"]
+            num_rows = metadata["num_rows"]
             for i in range(num_row_groups):
                 data_pieces.append(
                     pq.ParquetDatasetPiece(piece.path, piece.open_file_func,
