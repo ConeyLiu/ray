@@ -4,7 +4,6 @@ from typing import List, Optional, Union
 
 import pandas as pd
 import pyarrow.parquet as pq
-from pandas import DataFrame
 
 import ray.util.iter as para_iter
 from .dataset import MLDataset
@@ -14,11 +13,10 @@ from .interface import DataPiece, SourceShard
 class ParquetFileDataPiece(DataPiece):
     def __init__(self,
                  piece: pq.ParquetDatasetPiece,
-                 num_rows: int,
                  columns: Optional[List[str]],
                  partitions: Optional[pq.ParquetPartitions]):
         self._piece = piece
-        self._num_rows = num_rows
+        self._num_rows = None
         self._columns = columns
         self._partitions = partitions
 
@@ -30,6 +28,8 @@ class ParquetFileDataPiece(DataPiece):
 
     @property
     def num_records(self) -> int:
+        if not self._num_rows:
+            self._num_rows = self._piece.get_metadata().to_dict()["num_rows"]
         return self._num_rows
 
 
@@ -47,17 +47,8 @@ class ParquetSourceShard(SourceShard):
     def shard_id(self) -> int:
         return self._shard_id
 
-    @property
-    def num_records(self) -> int:
-        return sum([p.num_records for p in self._data_pieces])
-
     def get_data_pieces(self) -> List[DataPiece]:
         return self._data_pieces
-
-    def __iter__(self) -> Iterable[DataFrame]:
-        for piece in self._data_pieces:
-            for pdf in iter(piece):
-                yield pdf
 
 
 def read_parquet(paths: Union[str, List[str]],
@@ -98,25 +89,27 @@ def read_parquet(paths: Union[str, List[str]],
     """
     pq_ds = pq.ParquetDataset(paths, **kwargs)
     pieces = pq_ds.pieces
-    data_pieces = []
+    file_pieces = []
     if rowgroup_split:
         # split base on rowgroup
         for piece in pieces:
             metadata = piece.get_metadata().to_dict()
             num_row_groups = metadata["num_row_groups"]
-            num_rows = metadata["num_rows"]
             for i in range(num_row_groups):
-
-                data_pieces.append(
-                    pq.ParquetDatasetPiece(piece.path, piece.open_file_func,
-                                           piece.file_options, i,
-                                           piece.partition_keys))
+                data_piece = pq.ParquetDatasetPiece(piece.path,
+                                                    piece.open_file_func,
+                                                    piece.file_options, i,
+                                                    piece.partition_keys)
+                file_pieces.append(ParquetFileDataPiece(
+                    data_piece, columns, pq_ds.partitions))
     else:
         # split base on file pieces
-        data_pieces = pieces.copy()
+        for piece in pieces:
+            file_pieces.append(
+                ParquetFileDataPiece(piece, columns, pq_ds.partitions))
 
-    if len(data_pieces) < num_shards:
-        raise ValueError(f"number of data pieces: {len(data_pieces)} should "
+    if len(file_pieces) < num_shards:
+        raise ValueError(f"number of data pieces: {len(file_pieces)} should "
                          f"larger than num_shards: {num_shards}")
 
     if shuffle:
