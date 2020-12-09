@@ -2,21 +2,42 @@ import random
 from typing import Iterable
 from typing import List, Optional, Union
 
+import pandas as pd
 import pyarrow.parquet as pq
 from pandas import DataFrame
 
 import ray.util.iter as para_iter
 from .dataset import MLDataset
-from .interface import SourceShard
+from .interface import DataPiece, SourceShard
+
+
+class ParquetFileDataPiece(DataPiece):
+    def __init__(self,
+                 piece: pq.ParquetDatasetPiece,
+                 num_rows: int,
+                 columns: Optional[List[str]],
+                 partitions: Optional[pq.ParquetPartitions]):
+        self._piece = piece
+        self._num_rows = num_rows
+        self._columns = columns
+        self._partitions = partitions
+
+    def __iter__(self) -> Iterable[pd.DataFrame]:
+        return [self._piece.read(
+            columns=self._columns,
+            use_threads=False,
+            partitions=self._partitions).to_pandas()]
+
+    @property
+    def num_records(self) -> int:
+        return self._num_rows
 
 
 class ParquetSourceShard(SourceShard):
-    def __init__(self, data_pieces: List[pq.ParquetDatasetPiece],
-                 columns: Optional[List[str]],
-                 partitions: Optional[pq.ParquetPartitions], shard_id: int):
+    def __init__(self,
+                 data_pieces: List[ParquetFileDataPiece],
+                 shard_id: int):
         self._data_pieces = data_pieces
-        self._columns = columns
-        self._partitions = partitions
         self._shard_id = shard_id
 
     def prefix(self) -> str:
@@ -28,14 +49,15 @@ class ParquetSourceShard(SourceShard):
 
     @property
     def num_records(self) -> int:
-        pass
+        return sum([p.num_records for p in self._data_pieces])
+
+    def get_data_pieces(self) -> List[DataPiece]:
+        return self._data_pieces
 
     def __iter__(self) -> Iterable[DataFrame]:
         for piece in self._data_pieces:
-            yield piece.read(
-                columns=self._columns,
-                use_threads=False,
-                partitions=self._partitions).to_pandas()
+            for pdf in iter(piece):
+                yield pdf
 
 
 def read_parquet(paths: Union[str, List[str]],
@@ -84,6 +106,7 @@ def read_parquet(paths: Union[str, List[str]],
             num_row_groups = metadata["num_row_groups"]
             num_rows = metadata["num_rows"]
             for i in range(num_row_groups):
+
                 data_pieces.append(
                     pq.ParquetDatasetPiece(piece.path, piece.open_file_func,
                                            piece.file_options, i,
