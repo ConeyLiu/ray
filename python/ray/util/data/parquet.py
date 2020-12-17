@@ -1,13 +1,12 @@
-import random
 from typing import Iterable
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import pyarrow.parquet as pq
 
 import ray.util.iter as para_iter
 from .dataset import MLDataset
-from .interface import DataPiece, SourceShard
+from .reader import divide_data_pieces, DataPiece, OutOfIndexException, SourceReader
 
 
 class ParquetFileDataPiece(DataPiece):
@@ -15,30 +14,47 @@ class ParquetFileDataPiece(DataPiece):
                  piece: pq.ParquetDatasetPiece,
                  columns: Optional[List[str]],
                  partitions: Optional[pq.ParquetPartitions]):
-        self._piece = piece
-        self._num_rows = None
+        super(ParquetFileDataPiece, self).__init__()
+
+        self._row_groups = []
+        if piece.row_group is None:
+            for number in piece.get_metadata().to_dict()["num_row_groups"]:
+                self._row_groups.append(
+                    pq.ParquetDatasetPiece(piece.path, piece.open_file_func,
+                                           piece.file_options, number,
+                                           piece.partition_keys))
+        else:
+            self._row_groups.append(piece)
+        self._num_rows = piece.get_metadata().to_dict()["num_rows"]
         self._columns = columns
         self._partitions = partitions
 
     def __iter__(self) -> Iterable[pd.DataFrame]:
-        return [self._piece.read(
-            columns=self._columns,
-            use_threads=False,
-            partitions=self._partitions).to_pandas()]
+        return []
+
+    def read(self, batch_index: int) -> pd.DataFrame:
+        if batch_index < len(self._row_groups):
+            return self._row_groups[batch_index].read(
+                columns=self._columns,
+                use_threads=False,
+                partitions=self._partitions).to_pandas()
+        else:
+            raise OutOfIndexException
 
     @property
     def num_records(self) -> int:
-        if not self._num_rows:
-            self._num_rows = self._piece.get_metadata().to_dict()["num_rows"]
         return self._num_rows
 
 
-class ParquetSourceShard(SourceShard):
+class ParquetSourceShard(SourceReader):
     def __init__(self,
+                 shard_id: int,
                  data_pieces: List[ParquetFileDataPiece],
-                 shard_id: int):
+                 max_parallel: int = 1,
+                 resources: Dict = None):
+        super(ParquetSourceShard, self).__init__(
+            shard_id, max_parallel, resources)
         self._data_pieces = data_pieces
-        self._shard_id = shard_id
 
     def prefix(self) -> str:
         return "Parquet"
@@ -55,8 +71,9 @@ def read_parquet(paths: Union[str, List[str]],
                  num_shards: int,
                  rowgroup_split: bool = True,
                  shuffle: bool = False,
-                 shuffle_seed: int = None,
                  columns: Optional[List[str]] = None,
+                 max_parallel: int = 1,
+                 resources: Dict = None,
                  **kwargs) -> MLDataset:
     """Read parquet format data from hdfs like filesystem into a MLDataset.
 
@@ -81,8 +98,11 @@ def read_parquet(paths: Union[str, List[str]],
             rowgroup. If set False, each shard will have a list of files.
         shuffle (bool): whether shuffle the ParquetDatasetPiece order when
             divide into shards
-        shuffle_seed (int): the shuffle seed
         columns (Optional[List[str]]): a list of column names to read
+        max_parallel (int): the maximum parallelisms to support read in
+            concurrent for each shard
+        resources (Dict): the remote function resources for read data in
+            parallel
         kwargs: the other parquet read options
     Returns:
         A MLDataset
@@ -112,22 +132,9 @@ def read_parquet(paths: Union[str, List[str]],
         raise ValueError(f"number of data pieces: {len(file_pieces)} should "
                          f"larger than num_shards: {num_shards}")
 
-    if shuffle:
-        random_shuffle = random.Random(shuffle_seed)
-        random_shuffle.shuffle(data_pieces)
-    shards = [[] for _ in range(num_shards)]
-    for i, item in enumerate(data_pieces):
-        shard = shards[i % num_shards]
-        if item.row_group is None:
-            for number in item.get_metadata().to_dict()["num_row_groups"]:
-                shard.append(
-                    pq.ParquetDatasetPiece(item.path, item.open_file_func,
-                                           item.file_options, number,
-                                           item.partition_keys))
-        else:
-            shard.append(item)
-
-    for i, shard in enumerate(shards):
-        shards[i] = ParquetSourceShard(shard, columns, pq_ds.partitions, i)
+    rank_to_pieces = divide_data_pieces(file_pieces, num_shards)
+    shards = []
+    for i, pieces in rank_to_pieces.items():
+        shards.append(ParquetSourceShard(i, pieces, max_parallel, resources))
     it = para_iter.from_iterators(shards, False, "parquet")
     return MLDataset.from_parallel_it(it, batch_size=0, repeated=False)

@@ -82,7 +82,10 @@ class TorchMLDataset:
                  feature_types: Optional[List[torch.dtype]] = None,
                  label_column: Any = None,
                  label_shape: Optional[int] = None,
-                 label_type: Optional[torch.dtype] = None):
+                 label_type: Optional[torch.dtype] = None,
+                 shuffle: bool = False,
+                 shuffle_buffer_size: int = 1,
+                 seed: int = 0):
 
         self._feature_columns = feature_columns
         self._feature_shapes = feature_shapes
@@ -94,6 +97,10 @@ class TorchMLDataset:
         self._check_and_convert()
 
         self._ds = ds
+
+        self._shuffle = shuffle
+        self._shuffle_buffer_size = shuffle_buffer_size
+        self._seed = seed
 
     def _check_and_convert(self):
         # convert to list for convenience
@@ -136,14 +143,12 @@ class TorchMLDataset:
 
     def get_shard(self,
                   shard_index: int,
-                  batch_ms: int = 0,
                   num_async: int = 1,
-                  shuffle: bool = False,
-                  shuffle_buffer_size: int = 1,
-                  seed: int = None) -> torch.utils.data.IterableDataset:
+                  epoch: int = 0) -> torch.utils.data.IterableDataset:
 
-        it = self._ds.get_repeatable_shard(shard_index, batch_ms, num_async,
-                                           shuffle, shuffle_buffer_size, seed)
+        seed = self._seed + epoch
+        it = self._ds.get_repeatable_shard(shard_index, num_async, self._shuffle,
+                                           self._shuffle_buffer_size, seed)
         convert_fn = functools.partial(
             convert_to_tensor,
             feature_columns=self._feature_columns,

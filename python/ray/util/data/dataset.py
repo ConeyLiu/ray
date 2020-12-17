@@ -7,7 +7,7 @@ from ray.util.iter import (_NextValueNotReady, LocalIterator, ParallelIterator,
                            T, U)
 
 
-class MLDataset(ParallelIterator[pd.DataFrame]):
+class MLDataset:
     """A distributed ML dataset implemented based on ParallelIterator
 
     All item should be a list like object or dataclass instance.
@@ -17,10 +17,11 @@ class MLDataset(ParallelIterator[pd.DataFrame]):
             larger than zero, and 0 means unknown.
     """
 
-    def __init__(self, actor_sets: List["_ActorSet"], name: str,
-                 parent_iterators: List[ParallelIterator[pd.DataFrame]],
-                 batch_size: int, repeated: bool):
-        super(MLDataset, self).__init__(actor_sets, name, parent_iterators)
+    def __init__(self,
+                 name: str,
+                 actor_sets: List["_ActorSet"],
+                 batch_size: int,
+                 repeated: bool):
         self._batch_size = batch_size
         self._repeated = repeated
 
@@ -207,7 +208,6 @@ class MLDataset(ParallelIterator[pd.DataFrame]):
 
     def get_repeatable_shard(self,
                              index: int,
-                             batch_ms: int = 0,
                              num_async: int = 1,
                              shuffle: bool = False,
                              shuffle_buffer_size: int = 1,
@@ -219,10 +219,6 @@ class MLDataset(ParallelIterator[pd.DataFrame]):
         iterator when each call iter on the return.
         Args:
             index (int): the shard index id, -1 means collect all data.
-            batch_ms (int): Batches items for batch_ms milliseconds
-                before retrieving it. Increasing batch_ms increases latency
-                but improves throughput. If this value is 0, then items are
-                returned immediately.
             num_async (int): The max number of requests in flight. Increasing
                 this improves the amount of pipeline parallelism in the
                 iterator.
@@ -233,7 +229,7 @@ class MLDataset(ParallelIterator[pd.DataFrame]):
             The given shard iterator. If the shuffle is True, each call iter
             will return a different ordered iterator.
         """
-        return _RepeatableIterator(self, index, batch_ms, num_async, shuffle,
+        return _RepeatableIterator(self, index, num_async, shuffle,
                                    shuffle_buffer_size, seed)
 
     def to_torch(self,
@@ -242,7 +238,9 @@ class MLDataset(ParallelIterator[pd.DataFrame]):
                  feature_types=None,
                  label_column=None,
                  label_shape=None,
-                 label_type=None):
+                 label_type=None,
+                 shuffle=False,
+                 shuffle_buffer_size=None):
         """Create a TorchMLDataset from the current MLDataset.
 
         Args:
@@ -303,10 +301,6 @@ class _RepeatableIterator(Iterator[T]):
     Args:
         ds (MLDataset): a MLDataset
         shard_index (int): the shard index id. -1 means collect all data.
-        batch_ms (int): Batches items for batch_ms milliseconds
-            before retrieving it. Increasing batch_ms increases latency
-            but improves throughput. If this value is 0, then items are
-            returned immediately.
         num_async (int): The max number of requests in flight. Increasing this
             improves the amount of pipeline parallelism in the iterator.
         shuffle (bool): whether shuffle the given shard data
@@ -317,7 +311,6 @@ class _RepeatableIterator(Iterator[T]):
     def __init__(self,
                  ds: MLDataset,
                  shard_index: int,
-                 batch_ms: int = 0,
                  num_async: int = 1,
                  shuffle: bool = False,
                  shuffle_buffer_size: int = 1,
@@ -325,7 +318,6 @@ class _RepeatableIterator(Iterator[T]):
         super(_RepeatableIterator, self).__init__()
         self._ds = ds
         self._shard_index = shard_index
-        self._batch_ms = batch_ms
         self._num_async = num_async
         self._shuffle = shuffle
         self._shuffle_buffer_size = shuffle_buffer_size
@@ -340,12 +332,10 @@ class _RepeatableIterator(Iterator[T]):
 
     def __iter__(self) -> Iterator[T]:
         if self._shard_index >= 0:
-            it = self._ds.get_shard(self._shard_index, self._batch_ms,
-                                    self._num_async)
+            it = self._ds.get_shard(self._shard_index, 0, self._num_async)
         else:
             if self._num_async > 0:
-                it = self._ds.gather_async(
-                    batch_ms=self._batch_ms, num_async=self._num_async)
+                it = self._ds.gather_async(num_async=self._num_async)
             else:
                 it = self._ds.gather_sync()
         if self._shuffle:
