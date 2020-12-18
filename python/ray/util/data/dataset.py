@@ -5,6 +5,7 @@ import pandas as pd
 
 from ray.util.iter import (_NextValueNotReady, LocalIterator, ParallelIterator,
                            T, U)
+from .reader import Reader
 
 
 class MLDataset:
@@ -19,31 +20,15 @@ class MLDataset:
 
     def __init__(self,
                  name: str,
-                 actor_sets: List["_ActorSet"],
+                 reader: Reader,
+                 num_shards: int,
                  batch_size: int,
                  repeated: bool):
+        self._name = name
+        self._reader = reader
+        self._num_shards = num_shards
         self._batch_size = batch_size
         self._repeated = repeated
-
-    @staticmethod
-    def from_parallel_it(para_it: ParallelIterator[pd.DataFrame],
-                         batch_size: int,
-                         repeated: bool = False) -> "MLDataset":
-        """Create a MLDataset from an parallel iterator
-
-        The record of ParallelIterator should be pandas.DataFrame.
-
-        Args:
-            para_it (ParallelIterator[T]): An existing parallel iterator,
-                and each should be a list like object or dataclass instance
-            batch_size (int): The batch size of the current dataset. It
-                should be larger than zero, and 0 means unknown.
-            repeated (bool): whether the para_it is repeated.
-        Returns:
-            A MLDataset
-        """
-        return MLDataset(para_it.actor_sets, para_it.name,
-                         para_it.parent_iterators, batch_size, repeated)
 
     def __iter__(self):
         raise TypeError(
@@ -54,7 +39,7 @@ class MLDataset:
         return repr(self)
 
     def __repr__(self):
-        return f"MLDataset[{self.name}]"
+        return f"MLDataset[{self._name}]"
 
     def _with_transform(self, local_it_fn, name) -> "MLDataset":
         """Helper function to create new MLDataset"""

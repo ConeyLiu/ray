@@ -1,8 +1,6 @@
-from typing import Callable, Dict, List, Iterable, Type, Any, Union
+from typing import Callable, Dict, List, Iterable, Union
 
 import pandas as pd
-import ray
-import heapq
 
 
 class OutOfIndexException(Exception):
@@ -42,16 +40,18 @@ class DataPiece:
                 break
 
 
-class SourceReader:
+class ShardReader:
     """A interface for source data reading"""
 
     def __init__(self,
                  shard_id: int,
                  max_parallel: int = 1,
-                 resources: Dict = None):
+                 resources: Dict = None,
+                 balance_mode: bool = True):
         self._shard_id = shard_id
         self._max_parallel = max_parallel
         self._resources = resources or {}
+        self._balance_mode = balance_mode
         self.epoch = 0
 
     @property
@@ -78,49 +78,43 @@ class SourceReader:
     def max_parallel(self) -> int:
         return self._max_parallel
 
+    def resources(self):
+        return self._resources
+
     def read(self) -> Iterable[pd.DataFrame]:
         for piece in self.get_data_pieces():
             for pdf in iter(piece):
                 yield pdf
 
-    def read_parallel(self) -> Iterable[pd.DataFrame]:
-        pq = []
-        data_pieces = self.get_data_pieces()
-        batch_indexes = [0] * len(data_pieces)
-        remotes = [ray.remote(piece.read_remote).options(**self._resources)
-                   for piece in data_pieces]
-        for i, piece in enumerate(data_pieces):
-            heapq.heappush(pq,
-                           [batch_indexes[i], i])
+    def read_parallel(self) -> Iterable[Callable]:
+        if not self._balance_mode:
+            for piece in self.get_data_pieces():
+                batch_index = 0
+                while True:
+                    try:
+                        yield piece.read_remote(batch_index)
+                        batch_index += 1
+                    except OutOfIndexException:
+                        break
+        else:
+            data_pieces = self.get_data_pieces().copy()
+            batch_indexes = [0] * len(data_pieces)
+            index = 0
+            while True:
+                piece = data_pieces[index]
+                try:
+                    yield piece.read_remote(batch_indexes[index])
+                    batch_indexes[index] += 1
+                    index = (index + 1) % len(data_pieces)
+                except OutOfIndexException:
+                    data_pieces.pop(index)
+                    batch_indexes.pop(index)
+                    if len(data_pieces) == 0:
+                        break
+                    else:
+                        index = index % len(data_pieces)
 
-        futures: Dict[DataPiece, int] = {}
-        for _ in range(self._max_parallel):
-            batch_index, i = heapq.heappop(pq)
-            object_ref = remotes[i].remote(batch_index)
-            futures[object_ref] = i
-            heapq.heappush(pq, [batch_index + 1, i])
-            batch_indexes[i] += 1
-
-        while True:
-            pending = list(futures)
-            ready, _ = ray.wait(pending, num_returns=1)
-            ready_i = futures.pop(ready)
-            try:
-                df = ray.get(ready)
-                yield df
-                batch_index, i = heapq.heappop(pq)
-                while remotes[i] is None:
-                    batch_index, i = heapq.heappop(pq)
-                object_ref = remotes[i].remote(batch_index)
-                futures[object_ref] = i
-                heapq.heappush(pq, [batch_index + 1, i])
-                batch_indexes[i] += 1
-            except OutOfIndexException:
-                remotes[ready_i] = None
-                if all([piece is None for piece in remotes]):
-                    break
-
-    def __iter__(self) -> Iterable[pd.DataFrame]:
+    def __iter__(self) -> Union[Iterable[pd.DataFrame], Iterable[Callable]]:
         # set up
         [piece.setup(self.epoch) for piece in self.get_data_pieces()]
         self.epoch += 1
@@ -138,6 +132,14 @@ class SourceReader:
         else:
             suffix = ""
         return f"{self.prefix()}SourceShard[{self.shard_id}]" + suffix
+
+
+class Reader:
+    def repartition(self, num_partitions: int):
+        raise NotImplementedError
+
+    def get_shard(self, shard_id) -> "ShardReader":
+        raise NotImplementedError
 
 
 def divide_data_pieces(data_pieces: List[DataPiece],

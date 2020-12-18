@@ -1,7 +1,8 @@
 from typing import Callable, Dict, List
 
 import ray
-from ray.util.iter import _NextValueNotReady, LocalIterator
+from ray.util.iter import _NextValueNotReady, LocalIterator, SharedMetrics
+from .reader import SourceReader
 
 
 class Task:
@@ -91,9 +92,23 @@ class ParallelTaskSet:
 
 
 class TaskQueue:
-    def __init__(self, tasks: List[Task]):
+    def __init__(self,
+                 source_reader: SourceReader,
+                 tasks: List[Task]):
+        self.source_reader = source_reader
         self.tasks = tasks or []
         self.task_sets = []
+
+        self.add_task(self._create_source_reader_task())
+
+    def _create_source_reader_task(self):
+        def read(task_input):
+            return LocalIterator(lambda: iter(self.source_reader), SharedMetrics())
+        if self.source_reader.max_parallel() > 0:
+            return ParallelTask(read, self.source_reader.max_parallel(),
+                                self.source_reader.resources())
+        else:
+            return SerialTask(read)
 
     def add_task(self, task: Task):
         self.tasks.append(task)
