@@ -1,21 +1,21 @@
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, TypeVar
 
 import ray
 from ray.util.iter import _NextValueNotReady, LocalIterator, SharedMetrics
-from .reader import SourceReader
+from .reader import ReaderVar, SourceReaderVar
 
 
 class Task:
-    def __init__(self, task_fn: Callable):
-        self.task_fn = task_fn
-
     def execute(self, task_input: LocalIterator):
         raise NotImplementedError
 
 
+T = TypeVar("T", bound=Task)
+
+
 class SerialTask(Task):
     def __init__(self, task_fn: Callable):
-        super(SerialTask, self).__init__(task_fn)
+        self.task_fn = task_fn
 
     def execute(self, task_input: LocalIterator):
         return self.task_fn(task_input)
@@ -26,7 +26,7 @@ class ParallelTask(Task):
                  task_fn: Callable,
                  max_parallel: int,
                  resources: Dict):
-        super(ParallelTask, self).__init__(task_fn)
+        self.task_fn = task_fn
         self.max_parallel = max_parallel
         self.resources = resources
 
@@ -34,10 +34,16 @@ class ParallelTask(Task):
         def execute_fn(task_input):
             task_input = task_input_fn(task_input)
             return self.task_fn(task_input)
+
         return execute_fn
 
 
-def task_equal(a: Task, b: Task):
+class UnresolvedTask(Task):
+    def __init__(self, task_fn: Callable):
+        self.task_fn = task_fn
+
+
+def task_equal(a: T, b: T):
     if type(a) != type(b):
         return False
 
@@ -45,38 +51,49 @@ def task_equal(a: Task, b: Task):
         return True
     elif isinstance(a, ParallelTask):
         if (a.max_parallel == b.max_parallel and
-            a.resources == b.resources):
+           a.resources == b.resources):
             return True
     return False
 
 
-class SerialTaskSet:
-    def __init__(self, tasks: List[SerialTask]):
-        self.tasks = tasks
+class TaskSet:
+    def __init__(self, tasks: List[T]):
+        self._tasks = tasks
+        self._is_parallel = False
+
+        self.max_parallel = 1
+        self.resources = None
+        self.remote_task = None
+
+        self.set_up()
+
+    def set_up(self):
+        assert len(self._tasks) > 0
+        assert all([task_equal(self._tasks[0], t) for t in self._tasks])
+        if isinstance(self._tasks[0], ParallelTask):
+            task = self._tasks.pop(0)
+            for t in self._tasks:
+                task = t.execute(task)
+
+            def remote_fn(task_input):
+                return task(task_input)
+
+            self.max_parallel = self._tasks[0].max_parallel
+            self.resources = self._tasks[0].resources or {}
+            self.remote_task = ray.remote(remote_fn).options(**self.resources)
 
     def execute(self, input_it: LocalIterator):
-        for task in self.tasks:
+        if self._is_parallel:
+            return self._execute_parallel(input_it)
+        else:
+            return self._execute_serial(input_it)
+
+    def _execute_serial(self, input_it: LocalIterator):
+        for task in self._tasks:
             input_it = task.execute(input_it)
         return input_it
 
-
-class ParallelTaskSet:
-    def __init__(self,
-                 tasks: List[ParallelTask],
-                 max_parallel: int,
-                 resources: Dict):
-        task = tasks.pop(0)
-        for t in tasks:
-            task = t.execute(task)
-
-        def remote_fn(task_input):
-            return task(task_input)
-
-        self.max_parallel = max_parallel
-        self.resources = resources or {}
-        self.remote_task = ray.remote(remote_fn).options(**self.resources)
-
-    def execute(self, input_it: LocalIterator):
+    def _execute_parallel(self, input_it: LocalIterator):
         cur = []
         for item in iter(input_it):
             if isinstance(item, _NextValueNotReady):
@@ -91,51 +108,79 @@ class ParallelTaskSet:
             yield from ray.get(finished)
 
 
-class TaskQueue:
-    def __init__(self,
-                 source_reader: SourceReader,
-                 tasks: List[Task]):
-        self.source_reader = source_reader
-        self.tasks = tasks or []
-        self.task_sets = []
-
-        self.add_task(self._create_source_reader_task())
-
-    def _create_source_reader_task(self):
-        def read(task_input):
-            return LocalIterator(lambda: iter(self.source_reader), SharedMetrics())
-        if self.source_reader.max_parallel() > 0:
-            return ParallelTask(read, self.source_reader.max_parallel(),
-                                self.source_reader.resources())
-        else:
-            return SerialTask(read)
-
-    def add_task(self, task: Task):
-        self.tasks.append(task)
-
-    def _set_up(self):
-        self.task_sets = []
-        cur = []
-        for task in self.tasks:
-            if not cur or task_equal(cur[0], task):
-                cur.append(task)
-            else:
-                if isinstance(cur[0], SerialTask):
-                    self.task_sets.append(SerialTaskSet(cur))
-                else:
-                    self.task_sets.append(ParallelTaskSet(cur))
-                cur = []
-
-        if not cur:
-            return
-
-        if isinstance(cur[0], SerialTask):
-            self.task_sets.append(SerialTaskSet(cur))
-        else:
-            self.task_sets.append(ParallelTaskSet(cur))
+class ExecutionTask(Task):
+    def __init__(self, task_sets: List[TaskSet]):
+        self.task_sets = task_sets
 
     def execute(self, input_it: LocalIterator):
-        self._set_up()
         for task_set in self.task_sets:
             input_it = task_set.execute(input_it)
         return input_it
+
+
+class TaskQueue:
+    def __init__(self,
+                 reader: ReaderVar,
+                 tasks: List[T]):
+        self.reader = reader
+        self.tasks = tasks
+
+    def num_shards(self):
+        return self.reader.num_shards()
+
+    def with_task(self, task: T) -> "TaskQueue":
+        return TaskQueue(self.reader, self.tasks + [task])
+
+    def with_reader(self, reader: ReaderVar) -> "TaskQueue":
+        return TaskQueue(reader, self.tasks)
+
+    def _resolve_tasks(self):
+        resolved_tasks = []
+        for task in self.tasks:
+            if isinstance(task, UnresolvedTask):
+                if self.reader.max_parallel() > 1:
+                    task = ParallelTask(task.task_fn, self.reader.max_parallel(), self.reader.resources())
+                else:
+                    task = SerialTask(task.task_fn)
+            resolved_tasks.append(task)
+        return resolved_tasks
+
+    def _create_source_reader_task(self, source_reader: SourceReaderVar):
+        def read(task_input):
+            return LocalIterator(lambda: iter(source_reader), SharedMetrics())
+
+        if self.reader.max_parallel() > 0:
+            return ParallelTask(read, self.reader.max_parallel(),
+                                self.reader.resources())
+        else:
+            return SerialTask(read)
+
+    def create_execution_task(self):
+        task_sets = []
+        cur = []
+        for task in self._resolve_tasks():
+            if not cur or task_equal(cur[0], task):
+                cur.append(task)
+            else:
+                task_sets.append(cur)
+                cur = []
+
+        if cur:
+            task_sets.append(TaskSet(cur))
+        head, *tail = task_sets
+        execution_task = {}
+        for i in range(self.num_shards()):
+            source_reader = self.reader.get_shard(i)
+            source_reader_task = self._create_source_reader_task(source_reader)
+            if task_equal(source_reader_task, head[0]):
+                # prepend to the head task set
+                head_tasks = [source_reader_task] + head.copy()
+                task_set_list = [TaskSet(head_tasks)]
+                for tasks in tail:
+                    task_set_list.append(TaskSet(tasks))
+            else:
+                task_set_list = [TaskSet([source_reader_task])]
+                for tasks in task_sets:
+                    task_set_list.append(TaskSet(tasks))
+            execution_task[i] = ExecutionTask(task_set_list)
+        return execution_task

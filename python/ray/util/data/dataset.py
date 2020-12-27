@@ -1,39 +1,60 @@
 import random
-from typing import Callable, List, Iterable, Iterator
+from typing import Any, Callable, Dict, List, Iterable, Iterator, Optional, Union
 
 import pandas as pd
 
-from ray.util.iter import (_NextValueNotReady, LocalIterator, ParallelIterator,
+from ray.util.iter import (from_items, _NextValueNotReady, LocalIterator, ParallelIterator,
                            T, U)
-from .reader import Reader
+from .reader import ReaderVar, ParallelIteratorReader
+from .task import SerialTask, ParallelTask, TaskQueue, UnresolvedTask
 
 
 class MLDataset:
     """A distributed ML dataset implemented based on ParallelIterator
 
-    All item should be a list like object or dataclass instance.
-
     Args:
+        task_queues (List[TaskQueue]): which hold the tasks to execute.
         batch_size (int): The batch size of the current dataset. It should be
             larger than zero, and 0 means unknown.
     """
 
     def __init__(self,
                  name: str,
-                 reader: Reader,
-                 num_shards: int,
-                 batch_size: int,
-                 repeated: bool):
+                 task_queues: List[TaskQueue],
+                 batch_size: int):
         self._name = name
-        self._reader = reader
-        self._num_shards = num_shards
+        self._task_queues = task_queues
         self._batch_size = batch_size
-        self._repeated = repeated
+
+    @classmethod
+    def from_parallel_it(cls, it: ParallelIterator, batch_size: int = 0) -> "MLDataset":
+        """Create MLDataset from a existed ParallelIterator
+
+        Args:
+            it (ParallelIterator): the existed ParallelIterator, the item
+                should be pandas.DataFrame
+            batch_size (int): the batch size
+        """
+        reader = ParallelIteratorReader(it)
+        task_queue = TaskQueue(reader, [])
+        return MLDataset(it.name, [task_queue], batch_size)
+
+    @classmethod
+    def from_reader(cls, name: str, reader: ReaderVar, batch_size: int = 0) -> "MLDataset":
+        """Create MLDataset from a Reader"""
+        task_queue = TaskQueue(reader, [])
+        return MLDataset(name, [task_queue], batch_size)
+
+    @property
+    def batch_size(self) -> int:
+        return self._batch_size
+
+    @property
+    def num_shards(self) -> int:
+        return sum(q.num_shards() for q in self._task_queues)
 
     def __iter__(self):
-        raise TypeError(
-            "You must use it.gather_sync() or it.gather_async() to "
-            "iterate over the results of a MLDataset.")
+        raise TypeError("Unsupported operation")
 
     def __str__(self):
         return repr(self)
@@ -41,11 +62,44 @@ class MLDataset:
     def __repr__(self):
         return f"MLDataset[{self._name}]"
 
-    def _with_transform(self, local_it_fn, name) -> "MLDataset":
+    def _execute(self, action_fn: Optional[Callable[[ParallelIterator], Any]] = None) -> "ParallelIterator":
+        tasks = []
+        for q in self._task_queues:
+            tasks += q.create_execution_task().values()
+        tasks = [lambda:t.execute(None) for t in tasks]
+        it = from_items(tasks, self.num_shards, repeat=False)
+        if action_fn is not None:
+            it = action_fn(it)
+        return it
+
+    def _with_transform(self,
+                        local_it_fn,
+                        fn_name, max_parallel: Union[int, str] = 1,
+                        resources: Dict = None) -> "MLDataset":
         """Helper function to create new MLDataset"""
-        para_it = super()._with_transform(local_it_fn, name)
-        return MLDataset.from_parallel_it(para_it, self._batch_size,
-                                          self._repeated)
+        if max_parallel == "auto":
+            task = UnresolvedTask(local_it_fn)
+        elif max_parallel > 1:
+            task = ParallelTask(local_it_fn, max_parallel, resources)
+        else:
+            task = SerialTask(local_it_fn)
+        task_queues = [q.with_task(task) for q in self._task_queues]
+        return MLDataset(self._name + fn_name, task_queues, self._batch_size)
+
+    def map(self,
+            map_fn: Callable[[pd.DataFrame], pd.DataFrame],
+            max_parallel: Union[int, str] = "auto",
+            resources: Dict = None) -> "MLDataset":
+        return self._with_transform(
+            lambda it: it.for_each(map_fn), ".map()",
+            max_parallel, resources)
+
+    def filter(self, filter_fn: Callable[[pd.DataFrame], pd.DataFrame],
+               max_parallel: Union[int, str] = "auto",
+               resources: Dict = None) -> "MLDataset":
+        return self._with_transform(
+            lambda it: it.filter(filter_fn), ".filter()",
+            max_parallel, resources)
 
     def transform(
             self,
@@ -110,24 +164,11 @@ class MLDataset:
                 return_df.index = range(return_df.shape[0])
                 yield return_df
 
-        self._batch_size = batch_size
-        return self._with_transform(
+        new_ds = self._with_transform(
             lambda local_it: local_it.transform(batch_fn),
             f".batch({batch_size})")
-
-    def flatten(self) -> "MLDataset":
-        raise Exception("Unsupported operation")
-
-    def combine(self, fn: Callable[[T], List[U]]) -> "MLDataset":
-        raise Exception("Unsupported operation")
-
-    @property
-    def repeated(self) -> bool:
-        return self._repeated
-
-    @property
-    def batch_size(self) -> int:
-        return self._batch_size
+        new_ds._batch_size = batch_size
+        return new_ds
 
     def local_shuffle(self, shuffle_buffer_size: int,
                       seed: int = None) -> "MLDataset":
@@ -137,26 +178,43 @@ class MLDataset:
         apply the local_shuffle for each shards and then shuffle the each
         pandas DataFrame.
         """
-        ds = super().local_shuffle(shuffle_buffer_size, seed)
+        shuffle_random = random.Random(seed)
 
-        def shuffle_fn(it: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
-            for df in it:
-                df = df.sample(frac=1, random_state=seed)
-                yield df
+        def apply_shuffle(it):
+            buffer = []
+            for item in it:
+                if isinstance(item, _NextValueNotReady):
+                    yield item
+                else:
+                    buffer.append(item)
+                    if len(buffer) >= shuffle_buffer_size:
 
-        ds = ds._with_transform(
-            lambda local_it: local_it.transform(shuffle_fn),
-            ".inner_pandas_shuffle()")
+                        df = buffer.pop(
+                            shuffle_random.randint(0,
+                                                   len(buffer) - 1))
+                        df = df.sample(frac=1, random_state=seed)
+                        yield df
+            while len(buffer) > 0:
+                yield buffer.pop(shuffle_random.randint(0, len(buffer) - 1))
 
-        return ds
+        return self._with_transform(
+            lambda local_it: local_it.transform(apply_shuffle),
+            ".local_shuffle()")
 
-    def repartition(self, num_partitions: int,
-                    batch_ms: int = 0) -> "MLDataset":
+    def repartition(self, num_partitions: int) -> "MLDataset":
         """see ParallelIterator.repartition"""
-        if num_partitions == self.num_shards():
+        if num_partitions == self.num_shards:
             return self
-        para_it = super().repartition(num_partitions, batch_ms)
-        return MLDataset.from_parallel_it(para_it, self._batch_size)
+
+        if len(self._task_queues) == 1:
+            reader = self._task_queues[0].reader
+            reader = reader.repartition(num_partitions)
+            task_queue = self._task_queues[0].with_reader(reader)
+            return MLDataset(self._name + f".repartition({num_partitions})", [task_queue], self._batch_size)
+        else:
+            it = self._execute()
+            it = it.repartition(num_partitions)
+            return MLDataset.from_parallel_it(it)
 
     def union(self, other: "MLDataset") -> "MLDataset":
         """Return an iterator that is the union of this and the other."""
@@ -164,58 +222,29 @@ class MLDataset:
             raise TypeError(
                 f"other must be of type MLDataset, got {type(other)}")
 
-        if self._repeated != other.repeated:
-            raise TypeError(
-                f"want to union two MLDataset which have different repeated "
-                f"type, self repeated: {self._repeated}, other repeated: "
-                f"{other.repeated}")
-
         batch_size = 0
         if self._batch_size == other._batch_size:
             batch_size = self._batch_size
 
-        actor_sets = []
-        actor_sets.extend(self.actor_sets)
-        actor_sets.extend(other.actor_sets)
-        # if one of these iterators is a result of a repartition, we need to
-        # keep an explicit reference to its parent iterator
         return MLDataset(
-            actor_sets,
             f"ParallelUnion[{self}, {other}]",
-            parent_iterators=self.parent_iterators + other.parent_iterators,
-            batch_size=batch_size,
-            repeated=self._repeated)
+            self._task_queues + other._task_queues,
+            batch_size)
 
-    def select_shards(self, shards_to_keep: List[int]) -> "MLDataset":
-        para_it = super().select_shards(shards_to_keep)
-        return MLDataset.from_parallel_it(para_it, self._batch_size,
-                                          self._repeated)
+    def to_parallel_it(self) -> "ParallelIterator":
+        return self._execute()
 
-    def get_repeatable_shard(self,
-                             index: int,
-                             num_async: int = 1,
-                             shuffle: bool = False,
-                             shuffle_buffer_size: int = 1,
-                             seed: int = None) -> Iterator:
-        """Get the given shard of the current dataset.
+    def get_shard(self,
+                  shard_index: int,
+                  batch_ms: int = 0,
+                  num_async: int = 1) -> "LocalIterator[T]":
+        return self.to_parallel_it().get_shard(shard_index, batch_ms, num_async)
 
-        The return is a iterator. Each call iter on the returned iterator will
-        get the shard data from beginning. And it support shuffle the return
-        iterator when each call iter on the return.
-        Args:
-            index (int): the shard index id, -1 means collect all data.
-            num_async (int): The max number of requests in flight. Increasing
-                this improves the amount of pipeline parallelism in the
-                iterator.
-            shuffle (bool): whether shuffle the given shard data
-            shuffle_buffer_size (int): same as ParallelIterator.local_shuffle
-            seed (int): the random seed
-        Returns:
-            The given shard iterator. If the shuffle is True, each call iter
-            will return a different ordered iterator.
-        """
-        return _RepeatableIterator(self, index, num_async, shuffle,
-                                   shuffle_buffer_size, seed)
+    def gather_sync(self) -> "LocalIterator[T]":
+        return self.to_parallel_it().gather_sync()
+
+    def gather_async(self, batch_ms=0, num_async=1) -> "LocalIterator[T]":
+        return self.to_parallel_it().gather_async(batch_ms, num_async)
 
     def to_torch(self,
                  feature_columns=None,
@@ -224,8 +253,10 @@ class MLDataset:
                  label_column=None,
                  label_shape=None,
                  label_type=None,
+                 batch_size: int = 128,
                  shuffle=False,
-                 shuffle_buffer_size=None):
+                 shuffle_buffer_size=None,
+                 seed=None):
         """Create a TorchMLDataset from the current MLDataset.
 
         Args:
@@ -240,13 +271,27 @@ class MLDataset:
             label_shape (Optional[int]): the label shape.
             label_type (Optional["torch.dtype"]): the label type, this will be
                cast into torch.float by default
+            batch_size (int): the expected batch size
+            shuffle (bool): whether shuffle the data
+            shuffle_buffer_size (int): The algorithm fills a buffer with
+                shuffle_buffer_size elements and randomly samples elements from
+                this buffer, replacing the selected elements with new elements.
+                For perfect shuffling, this argument should be greater than or
+                equal to the largest iterator size.
+            seed (int): Seed to use for
+                randomness. Default value is None.
+
         Returns:
             A TorchMLDataset
         """
+        if batch_size != self.batch_size:
+            ds = self.batch(batch_size)
+        else:
+            ds = self
         from ray.util.sgd.torch.torch_dataset import TorchMLDataset
-        return TorchMLDataset(self, feature_columns, feature_shapes,
+        return TorchMLDataset(ds, feature_columns, feature_shapes,
                               feature_types, label_column, label_shape,
-                              label_type)
+                              label_type, shuffle, shuffle_buffer_size, seed)
 
     def to_tf(self,
               feature_columns=None,
@@ -254,7 +299,11 @@ class MLDataset:
               feature_types=None,
               label_column=None,
               label_shape=None,
-              label_type=None):
+              label_type=None,
+              batch_size: int = 128,
+              shuffle=False,
+              buffer_size: int = 128,
+              seed=None):
         """Create a TFMLDataset from the current MLDataset.
 
         Args:
@@ -269,13 +318,19 @@ class MLDataset:
             label_shape (Optional[tf.TensorShape]): the label shape.
             label_type (Optional["tf.DType"]): the label type, this will be
                cast into tf.float by default
+            batch_size (int): the expected batch size
+            shuffle (bool): whether shuffle the data
+            buffer_size (int): representing the number of elements from this
+               dataset from which the new dataset will sample.
+            seed (int): Seed to use for
+                randomness. Default value is None.
         Returns:
             A TFMLDataset
         """
         from ray.util.sgd.tf.tf_dataset import TFMLDataset
         return TFMLDataset(self, feature_columns, feature_shapes,
                            feature_types, label_column, label_shape,
-                           label_type)
+                           label_type, batch_size, shuffle, buffer_size, seed)
 
 
 class _RepeatableIterator(Iterator[T]):
@@ -284,7 +339,7 @@ class _RepeatableIterator(Iterator[T]):
     Each call iter(_RepeatableIterator instance) will fetch the data from
     beginning and will return a different order or data if set shuffle
     Args:
-        ds (MLDataset): a MLDataset
+        it (ParallelIterator): a ParallelIterator
         shard_index (int): the shard index id. -1 means collect all data.
         num_async (int): The max number of requests in flight. Increasing this
             improves the amount of pipeline parallelism in the iterator.
@@ -294,18 +349,22 @@ class _RepeatableIterator(Iterator[T]):
     """
 
     def __init__(self,
-                 ds: MLDataset,
+                 it: ParallelIterator,
                  shard_index: int,
+                 batch_ms: int = 0,
                  num_async: int = 1,
                  shuffle: bool = False,
                  shuffle_buffer_size: int = 1,
+                 item_shuffle_fn: Callable = None,
                  seed: int = None):
         super(_RepeatableIterator, self).__init__()
-        self._ds = ds
+        self._it = it
         self._shard_index = shard_index
         self._num_async = num_async
+        self._batch_ms = batch_ms
         self._shuffle = shuffle
         self._shuffle_buffer_size = shuffle_buffer_size
+        self._item_shuffle_fn = item_shuffle_fn or (lambda x: x)
         self._seed = seed
         self._local_it: LocalIterator[T] = None
 
@@ -317,12 +376,12 @@ class _RepeatableIterator(Iterator[T]):
 
     def __iter__(self) -> Iterator[T]:
         if self._shard_index >= 0:
-            it = self._ds.get_shard(self._shard_index, 0, self._num_async)
+            it = self._it.get_shard(self._shard_index, self._batch_ms, self._num_async)
         else:
             if self._num_async > 0:
-                it = self._ds.gather_async(num_async=self._num_async)
+                it = self._it.gather_async(self._batch_ms, num_async=self._num_async)
             else:
-                it = self._ds.gather_sync()
+                it = self._it.gather_sync()
         if self._shuffle:
             it = self.shuffle(it)
 
@@ -344,11 +403,11 @@ class _RepeatableIterator(Iterator[T]):
                         item = buffer.pop(
                             shuffle_random.randint(0,
                                                    len(buffer) - 1))
-                        item = item.sample(frac=1, random_state=self._seed)
+                        item = self._item_shuffle_fn(item)
                         yield item
             while len(buffer) > 0:
                 item = buffer.pop(shuffle_random.randint(0, len(buffer) - 1))
-                item = item.sample(frac=1, random_state=self._seed)
+                item = self._item_shuffle_fn(item)
                 yield item
 
         return LocalIterator(

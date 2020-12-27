@@ -87,7 +87,7 @@ def from_parallel_iter(para_it: ParallelIterator[T],
     else:
         batch_size = 0
 
-    return MLDataset.from_parallel_it(para_it, batch_size, repeated)
+    return MLDataset.from_parallel_it(para_it, batch_size)
 
 
 __all__ = ["from_parallel_iter", "read_parquet", "MLDataset"]

@@ -1,57 +1,28 @@
-from typing import Callable, Dict, List, Iterable, Union
+from typing import Callable, Dict, List, Iterable, Union, TypeVar
 
 import pandas as pd
 
-
-class OutOfIndexException(Exception):
-    pass
+from ray.util.iter import ParallelIterator
 
 
-class DataPiece:
-    def __init__(self):
-        self._batch_index = 0
+class SourceReader:
+    """A interface for given shard source data reading
 
-    @property
-    def num_records(self) -> int:
-        """The number of records for this data piece.
-
-        This should be equal with sum of all pandas DataFrame rows.
-        """
-        raise NotImplementedError
-
-    def setup(self, epoch: int):
-        self._batch_index = 0
-
-    def read(self, batch_index: int) -> pd.DataFrame:
-        raise OutOfIndexException
-
-    def read_remote(self, batch_index: int) -> Callable:
-        def f():
-            return self.read(batch_index)
-        return f
-
-    def __iter__(self) -> Iterable[pd.DataFrame]:
-        while True:
-            try:
-                value = self.read(self._batch_index)
-                yield value
-                self._batch_index += 1
-            except OutOfIndexException:
-                break
-
-
-class ShardReader:
-    """A interface for source data reading"""
+    Args:
+        shard_id (int): the shard id
+        max_parallel (int): the maximum parallelism for this source data
+            reading. This is should be same as Reader.max_parallel()
+        resources (Dict): the resources required for the parallel data
+            reading. This is should be same as Reader.resources()
+    """
 
     def __init__(self,
                  shard_id: int,
                  max_parallel: int = 1,
-                 resources: Dict = None,
-                 balance_mode: bool = True):
+                 resources: Dict = None):
         self._shard_id = shard_id
         self._max_parallel = max_parallel
         self._resources = resources or {}
-        self._balance_mode = balance_mode
         self.epoch = 0
 
     @property
@@ -64,15 +35,12 @@ class ShardReader:
 
         This should be equal with sum of all pandas DataFrame rows.
         """
-        return sum([p.num_records for p in self.get_data_pieces()])
+        raise NotImplementedError
 
     def set_epoch(self, epoch):
         self.epoch = epoch
 
     def prefix(self) -> str:
-        raise NotImplementedError
-
-    def get_data_pieces(self) -> List[DataPiece]:
         raise NotImplementedError
 
     def max_parallel(self) -> int:
@@ -82,42 +50,14 @@ class ShardReader:
         return self._resources
 
     def read(self) -> Iterable[pd.DataFrame]:
-        for piece in self.get_data_pieces():
-            for pdf in iter(piece):
-                yield pdf
+        """Read the source data in serial mode"""
+        raise NotImplementedError
 
     def read_parallel(self) -> Iterable[Callable]:
-        if not self._balance_mode:
-            for piece in self.get_data_pieces():
-                batch_index = 0
-                while True:
-                    try:
-                        yield piece.read_remote(batch_index)
-                        batch_index += 1
-                    except OutOfIndexException:
-                        break
-        else:
-            data_pieces = self.get_data_pieces().copy()
-            batch_indexes = [0] * len(data_pieces)
-            index = 0
-            while True:
-                piece = data_pieces[index]
-                try:
-                    yield piece.read_remote(batch_indexes[index])
-                    batch_indexes[index] += 1
-                    index = (index + 1) % len(data_pieces)
-                except OutOfIndexException:
-                    data_pieces.pop(index)
-                    batch_indexes.pop(index)
-                    if len(data_pieces) == 0:
-                        break
-                    else:
-                        index = index % len(data_pieces)
+        """Read the source data in parallel mode."""
+        raise NotImplementedError
 
     def __iter__(self) -> Union[Iterable[pd.DataFrame], Iterable[Callable]]:
-        # set up
-        [piece.setup(self.epoch) for piece in self.get_data_pieces()]
-        self.epoch += 1
         if self.max_parallel() > 1:
             return iter(self.read_parallel())
         else:
@@ -135,39 +75,76 @@ class ShardReader:
 
 
 class Reader:
-    def repartition(self, num_partitions: int):
-        raise NotImplementedError
+    """A interface for source data reading.
 
-    def get_shard(self, shard_id) -> "ShardReader":
-        raise NotImplementedError
-
-
-def divide_data_pieces(data_pieces: List[DataPiece],
-                       world_size: int) -> Dict:
-    """Divide the data pieces into world_size partitions
-
-    Divide the data pieces into world_size partitions and return a word rank
-    to a list of data pieces mapping.
-    Args:
-        data_pieces (List[DataPiece]): the data pieces to be divided
-        world_size (int): the data pieces will be divided into world_size
-                          partitions
-    Returns:
-        a dict, the key is the world rank, and the value the data pieces
+    This is a common interface for data reading of MLDataset. See the
+    following: ParallelIteratorReader as a example.
     """
-    if len(data_pieces) < world_size:
-        raise Exception("do not have enough data pieces to divide")
-    results = {}
-    tmp_queue = {}
-    for i in range(world_size):
-        results[i] = []
-        tmp_queue[i] = 0
-    sorted_pieces = sorted(data_pieces,
-                           key=lambda item: item.num_records,
-                           reverse=True)
-    for piece in sorted_pieces:
-        rank = sorted(tmp_queue, key=lambda x: tmp_queue[x])[0]
-        results[rank].append(piece)
-        tmp_queue[rank] = tmp_queue[rank] + piece.num_records
+    def num_shards(self) -> int:
+        """Return the number of shards"""
+        raise NotImplementedError
 
-    return results
+    def repartition(self, num_partitions: int) -> "Reader":
+        """Repartition the shards"""
+        raise NotImplementedError
+
+    def get_shard(self, shard_id) -> "SourceReader":
+        raise NotImplementedError
+
+    def repeated(self) -> bool:
+        return False
+
+    def max_parallel(self) -> int:
+        """The maximum parallelism
+
+        It means whether we support read the source data parallel. The
+        SourceReader must support read_parallel if this is larger than one.
+        """
+        return 1
+
+    def resources(self) -> Dict:
+        """The resources required for the parallel reading task"""
+        return None
+
+
+ReaderVar = TypeVar("ReaderVar", bound=Reader)
+SourceReaderVar = TypeVar("SourceReaderVar", bound=SourceReader)
+
+
+class ParallelIteratorSourceReader(SourceReader):
+
+    def __init__(self,
+                 shard_id,
+                 it: ParallelIterator):
+        super(ParallelIteratorSourceReader, self).__init__(shard_id, 1, None)
+        self._it = it
+        self._num_records = None
+
+    @property
+    def num_records(self) -> int:
+        if not self._num_records:
+            self._num_records = sum(self._it.get_shard(self.shard_id))
+        return self._num_records
+
+    def prefix(self) -> str:
+        return "ParallelIterator"
+
+    def read(self) -> Iterable[pd.DataFrame]:
+        return iter(self._it.get_shard(self.shard_id))
+
+    def read_parallel(self) -> Iterable[Callable]:
+        raise Exception("Not supported operation")
+
+
+class ParallelIteratorReader(Reader):
+    def __init__(self, it: ParallelIterator):
+        self._it = it
+
+    def num_shards(self) -> int:
+        return self._it.num_shards()
+
+    def repartition(self, num_partitions: int) -> "Reader":
+        return ParallelIteratorReader(self._it.repartition(num_partitions))
+
+    def get_shard(self, shard_id) -> "SourceReader":
+        return ParallelIteratorSourceReader(shard_id, self._it)

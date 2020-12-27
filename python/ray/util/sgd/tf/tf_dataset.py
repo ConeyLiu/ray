@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 import tensorflow as tf
 
 from ray.util.data import MLDataset
+from ray.util.data.dataset import _RepeatableIterator
 
 
 class TFMLDataset:
@@ -34,7 +35,11 @@ class TFMLDataset:
                  feature_shapes: Optional[List[tf.TensorShape]],
                  feature_types: Optional[List[tf.DType]], label_column: Any,
                  label_shape: Optional[tf.TensorShape],
-                 label_type: Optional[tf.DType]):
+                 label_type: Optional[tf.DType],
+                 batch_size: int = 128,
+                 shuffle=False,
+                 buffer_size: int = 128,
+                 seed=None):
 
         self._feature_columns = feature_columns
         self._feature_shapes = feature_shapes
@@ -42,6 +47,10 @@ class TFMLDataset:
         self._label_column = label_column
         self._label_shape = label_shape
         self._label_type = label_type
+        self._batch_size = batch_size
+        self._shuffle = shuffle
+        self._buffer_size = buffer_size
+        self._seed = seed
 
         self._check_and_convert()
 
@@ -92,18 +101,16 @@ class TFMLDataset:
     def get_shard(self,
                   shard_index: int,
                   batch_ms: int = 0,
-                  num_async: int = 1,
-                  shuffle: bool = False,
-                  shuffle_buffer_size: int = 1,
-                  seed: int = None) -> "tf.data.Dataset":
+                  num_async: int = 1) -> "tf.data.Dataset":
         """ Get the given shard data.
 
         Get a the given shard data from MLDataset and convert into a
         tensorflow.data.Dataset. If the shard_index is smaller than zero,
         it will collect all data as a tensorflow.data.Dataset.
         """
-        it = self._ds.get_repeatable_shard(shard_index, batch_ms, num_async,
-                                           shuffle, shuffle_buffer_size, seed)
+        parallel_it = self._ds.to_parallel_it()
+        it = _RepeatableIterator(parallel_it, shard_index, batch_ms=batch_ms,
+                                 num_async=num_async)
 
         def make_generator():
             for df in iter(it):
@@ -133,5 +140,7 @@ class TFMLDataset:
         ds = tf.data.Dataset.from_generator(
             make_generator,
             output_types=output_types,
-            output_shapes=output_shapes)
+            output_shapes=output_shapes).batch(self._batch_size)
+        if self._shuffle:
+            ds = ds.shuffle(self._buffer_size, self._seed)
         return ds
