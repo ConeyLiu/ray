@@ -63,6 +63,7 @@ class ParquetSourceShard(SourceReader):
     def __init__(self,
                  shard_id: int,
                  data_pieces: List[ParquetFileDataPiece],
+                 batch_size: int,
                  max_parallel: int = 1,
                  resources: Dict = None,
                  balance_mode: bool = True):
@@ -120,6 +121,7 @@ class ParquetReader(Reader):
     def __init__(self,
                  paths: Union[str, List[str]],
                  num_shards: int,
+                 batch_size: int,
                  rowgroup_split: bool = True,
                  columns: Optional[List[str]] = None,
                  max_parallel: int = 1,
@@ -127,6 +129,7 @@ class ParquetReader(Reader):
                  **read_options):
         self._paths = paths
         self._num_shards = num_shards
+        self._batch_size = batch_size
         self._rowgroup_split = rowgroup_split
         self._columns = columns
         self._max_parallel = max_parallel
@@ -172,13 +175,16 @@ class ParquetReader(Reader):
                 ParquetSourceShard(i, pieces, self.max_parallel(), self.resources()))
         return shards
 
+    def batch_size(self) -> int:
+        return self._batch_size
+
     def num_shards(self) -> int:
         return self._num_shards
 
     def repartition(self, num_partitions: int):
         if self._num_shards != num_partitions:
             return ParquetReader(
-                self._paths, num_partitions, self._rowgroup_split, self._columns,
+                self._paths, num_partitions, self._batch_size, self._rowgroup_split, self._columns,
                 self._max_parallel, self._resources, **self._read_options)
 
     def get_shard(self, shard_id) -> "SourceReader":
@@ -228,6 +234,7 @@ def divide_data_pieces(data_pieces: List[ParquetFileDataPiece],
 
 def read_parquet(paths: Union[str, List[str]],
                  num_shards: int,
+                 batch_size: int = 128,
                  rowgroup_split: bool = True,
                  columns: Optional[List[str]] = None,
                  max_parallel: int = 1,
@@ -263,6 +270,6 @@ def read_parquet(paths: Union[str, List[str]],
     Returns:
         A MLDataset
     """
-    reader = ParquetReader(paths, num_shards, rowgroup_split, columns,
+    reader = ParquetReader(paths, num_shards, batch_size, rowgroup_split, columns,
                            max_parallel, resources, **read_options)
     return MLDataset.from_reader("parquet", reader)

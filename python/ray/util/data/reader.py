@@ -80,6 +80,11 @@ class Reader:
     This is a common interface for data reading of MLDataset. See the
     following: ParallelIteratorReader as a example.
     """
+    def batch_size(self) -> int:
+        """This means the each record(pandas.DataFrame) will have batch size
+        of rows. 0 means known."""
+        return 0
+
     def num_shards(self) -> int:
         """Return the number of shards"""
         raise NotImplementedError
@@ -137,8 +142,12 @@ class ParallelIteratorSourceReader(SourceReader):
 
 
 class ParallelIteratorReader(Reader):
-    def __init__(self, it: ParallelIterator):
+    def __init__(self, it: ParallelIterator, batch_size):
         self._it = it
+        self._batch_size = batch_size
+
+    def batch_size(self) -> int:
+        return self._batch_size
 
     def num_shards(self) -> int:
         return self._it.num_shards()

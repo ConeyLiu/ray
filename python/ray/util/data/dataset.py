@@ -8,6 +8,13 @@ from ray.util.iter import (from_items, _NextValueNotReady, LocalIterator, Parall
 from .reader import ReaderVar, ParallelIteratorReader
 from .task import SerialTask, ParallelTask, TaskQueue, UnresolvedTask
 
+from enum import Enum
+
+
+class ShuffleMode(Enum):
+    record_level = 1
+    local_batch_level = 2
+
 
 class MLDataset:
     """A distributed ML dataset implemented based on ParallelIterator
@@ -66,21 +73,38 @@ class MLDataset:
         tasks = []
         for q in self._task_queues:
             tasks += q.create_execution_task().values()
-        tasks = [lambda:t.execute(None) for t in tasks]
+        tasks = [lambda:t.execute(s) for s, t in tasks]
         it = from_items(tasks, self.num_shards, repeat=False)
         if action_fn is not None:
             it = action_fn(it)
         return it
 
     def _with_transform(self,
+                        fn,
                         local_it_fn,
                         fn_name, max_parallel: Union[int, str] = 1,
                         resources: Dict = None) -> "MLDataset":
-        """Helper function to create new MLDataset"""
+        """Helper function to create new MLDataset
+
+        Args:
+            fn (Callable[[pd.DataFrame], pd.DataFrame]): the transform function
+                which will apply to each record. This function will be used for
+                create a parallel task.
+            local_it_fn (Callable[[Iterable[pd.DataFrame]],
+                                  Iterable[pd.DataFrame]]) the transform
+                function accept a iterable of pd.DataFrame as input and
+                output a iterable of pd.DataFrame. This function will be used
+                for create a serial task.
+            fn_name (str), the name of the transform function
+            max_parallel (int): the maximum parallelism of this transform
+                function to execute
+            resources (Dict): remote function resources, this is only needes
+                when max_parallel is larger than 1
+        """
         if max_parallel == "auto":
-            task = UnresolvedTask(local_it_fn)
+            task = UnresolvedTask(fn, local_it_fn)
         elif max_parallel > 1:
-            task = ParallelTask(local_it_fn, max_parallel, resources)
+            task = ParallelTask(fn, max_parallel, resources)
         else:
             task = SerialTask(local_it_fn)
         task_queues = [q.with_task(task) for q in self._task_queues]
@@ -91,14 +115,19 @@ class MLDataset:
             max_parallel: Union[int, str] = "auto",
             resources: Dict = None) -> "MLDataset":
         return self._with_transform(
-            lambda it: it.for_each(map_fn), ".map()",
-            max_parallel, resources)
+            map_fn, lambda it: it.for_each(map_fn), ".map()", max_parallel,
+            resources)
 
-    def filter(self, filter_fn: Callable[[pd.DataFrame], pd.DataFrame],
+    def filter(self, filter_fn: Callable[[pd.DataFrame], bool],
                max_parallel: Union[int, str] = "auto",
                resources: Dict = None) -> "MLDataset":
+        def filter_fn_parallel(df: pd.DataFrame) -> pd.DataFrame:
+            if filter_fn(df):
+                return df
+            else:
+                return _NextValueNotReady()
         return self._with_transform(
-            lambda it: it.filter(filter_fn), ".filter()",
+            filter_fn_parallel, lambda it: it.filter(filter_fn), ".filter()",
             max_parallel, resources)
 
     def transform(
@@ -115,8 +144,9 @@ class MLDataset:
         Returns:
             A new MLDataset
         """
-        return self._with_transform(lambda local_it: local_it.transform(fn),
-                                    ".transform()")
+        return self._with_transform(
+            None, lambda local_it: local_it.transform(fn), ".transform()",
+            max_parallel=1, resources=None)
 
     def batch(self, batch_size: int) -> "MLDataset":
         """Rebatch the number of rows for each pandas.DataFrame record
@@ -165,12 +195,16 @@ class MLDataset:
                 yield return_df
 
         new_ds = self._with_transform(
-            lambda local_it: local_it.transform(batch_fn),
+            None, lambda local_it: local_it.transform(batch_fn),
             f".batch({batch_size})")
         new_ds._batch_size = batch_size
         return new_ds
 
-    def local_shuffle(self, shuffle_buffer_size: int,
+    def local_shuffle(self,
+                      shuffle_mode: ShuffleMode = ShuffleMode.record_level,
+                      max_parallel: Union[int, str] = "auto",
+                      resources: Dict = None,
+                      shuffle_buffer_size: int = 1,
                       seed: int = None) -> "MLDataset":
         """Applying local shuffle
 
@@ -197,9 +231,19 @@ class MLDataset:
             while len(buffer) > 0:
                 yield buffer.pop(shuffle_random.randint(0, len(buffer) - 1))
 
-        return self._with_transform(
-            lambda local_it: local_it.transform(apply_shuffle),
-            ".local_shuffle()")
+        if shuffle_mode == ShuffleMode.record_level:
+            def parallel_shuffle(df):
+                return df.sample(frac=1, random_state=seed)
+            name = ".local_shuffle(record_level)"
+            return self._with_transform(
+                parallel_shuffle,
+                lambda local_it: local_it.transform(apply_shuffle),
+                name, max_parallel, resources)
+        else:
+            name = ".local_shuffle(local_batch_level)"
+            return self._with_transform(
+                None, lambda local_it: local_it.transform(apply_shuffle), name,
+                max_parallel=1, resources=None)
 
     def repartition(self, num_partitions: int) -> "MLDataset":
         """see ParallelIterator.repartition"""
@@ -214,7 +258,7 @@ class MLDataset:
         else:
             it = self._execute()
             it = it.repartition(num_partitions)
-            return MLDataset.from_parallel_it(it)
+            return MLDataset.from_parallel_it(it, self._batch_size)
 
     def union(self, other: "MLDataset") -> "MLDataset":
         """Return an iterator that is the union of this and the other."""

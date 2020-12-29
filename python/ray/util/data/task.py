@@ -1,4 +1,4 @@
-from typing import Callable, Dict, List, TypeVar
+from typing import Any, Callable, Dict, List, TypeVar
 
 import ray
 from ray.util.iter import _NextValueNotReady, LocalIterator, SharedMetrics
@@ -6,7 +6,7 @@ from .reader import ReaderVar, SourceReaderVar
 
 
 class Task:
-    def execute(self, task_input: LocalIterator):
+    def execute(self, task_input: Any) -> Any:
         raise NotImplementedError
 
 
@@ -17,7 +17,7 @@ class SerialTask(Task):
     def __init__(self, task_fn: Callable):
         self.task_fn = task_fn
 
-    def execute(self, task_input: LocalIterator):
+    def execute(self, task_input: LocalIterator) -> LocalIterator:
         return self.task_fn(task_input)
 
 
@@ -39,8 +39,12 @@ class ParallelTask(Task):
 
 
 class UnresolvedTask(Task):
-    def __init__(self, task_fn: Callable):
-        self.task_fn = task_fn
+    def __init__(self, serial_fn: Callable, parallel_fn: Callable):
+        self.serial_fn = serial_fn
+        self.parallel_fn = parallel_fn
+
+    def execute(self, task_input: Any) -> Any:
+        raise ValueError("UnresolvedTask does not support execute")
 
 
 def task_equal(a: T, b: T):
@@ -71,6 +75,7 @@ class TaskSet:
         assert len(self._tasks) > 0
         assert all([task_equal(self._tasks[0], t) for t in self._tasks])
         if isinstance(self._tasks[0], ParallelTask):
+            self._is_parallel = True
             task = self._tasks.pop(0)
             for t in self._tasks:
                 task = t.execute(task)
@@ -82,9 +87,9 @@ class TaskSet:
             self.resources = self._tasks[0].resources or {}
             self.remote_task = ray.remote(remote_fn).options(**self.resources)
 
-    def execute(self, input_it: LocalIterator):
+    def execute(self, input_it: LocalIterator) -> LocalIterator:
         if self._is_parallel:
-            return self._execute_parallel(input_it)
+            return LocalIterator(lambda: self._execute_parallel(input_it), SharedMetrics())
         else:
             return self._execute_serial(input_it)
 
@@ -139,21 +144,13 @@ class TaskQueue:
         for task in self.tasks:
             if isinstance(task, UnresolvedTask):
                 if self.reader.max_parallel() > 1:
-                    task = ParallelTask(task.task_fn, self.reader.max_parallel(), self.reader.resources())
+                    task = ParallelTask(
+                        task.parallel_fn, self.reader.max_parallel(),
+                        self.reader.resources())
                 else:
-                    task = SerialTask(task.task_fn)
+                    task = SerialTask(task.serial_fn)
             resolved_tasks.append(task)
         return resolved_tasks
-
-    def _create_source_reader_task(self, source_reader: SourceReaderVar):
-        def read(task_input):
-            return LocalIterator(lambda: iter(source_reader), SharedMetrics())
-
-        if self.reader.max_parallel() > 0:
-            return ParallelTask(read, self.reader.max_parallel(),
-                                self.reader.resources())
-        else:
-            return SerialTask(read)
 
     def create_execution_task(self):
         task_sets = []
@@ -167,20 +164,10 @@ class TaskQueue:
 
         if cur:
             task_sets.append(TaskSet(cur))
-        head, *tail = task_sets
+
         execution_task = {}
         for i in range(self.num_shards()):
             source_reader = self.reader.get_shard(i)
-            source_reader_task = self._create_source_reader_task(source_reader)
-            if task_equal(source_reader_task, head[0]):
-                # prepend to the head task set
-                head_tasks = [source_reader_task] + head.copy()
-                task_set_list = [TaskSet(head_tasks)]
-                for tasks in tail:
-                    task_set_list.append(TaskSet(tasks))
-            else:
-                task_set_list = [TaskSet([source_reader_task])]
-                for tasks in task_sets:
-                    task_set_list.append(TaskSet(tasks))
-            execution_task[i] = ExecutionTask(task_set_list)
+            source_reader = LocalIterator(lambda: iter(source_reader), SharedMetrics())
+            execution_task[i] = (source_reader, ExecutionTask(task_sets.copy()))
         return execution_task
