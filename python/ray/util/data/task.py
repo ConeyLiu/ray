@@ -39,7 +39,13 @@ class ParallelTask(Task):
 
 
 class NoopParallelTask(ParallelTask):
-    def execute(self, task_input: Callable) -> Callable:
+    def __init__(self,
+                 max_parallel: int,
+                 resources: Dict):
+        super(NoopParallelTask, self).__init__(
+            lambda x: x, max_parallel, resources)
+
+    def __call__(self, task_input):
         return task_input
 
 
@@ -177,9 +183,9 @@ class TaskQueue:
             if (len(task_sets) == 0 or not task_sets[0].is_parallel or
                 self.reader.max_parallel() != task_sets[0].max_parallel or
                     self.reader.resources() != task_sets[0].resources):
-                # prepend NoopTask to parallel reading source data
+                # prepend NoopParallelTask for reading source data parallel
                 noop_set = TaskSet([NoopParallelTask(
-                    None, self.reader.max_parallel(), self.reader.resources())])
+                    self.reader.max_parallel(), self.reader.resources())])
                 task_sets.insert(0, noop_set)
 
         def create_init_fn(source_reader):

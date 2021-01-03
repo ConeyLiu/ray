@@ -5,7 +5,11 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from .dataset import MLDataset
-from .reader import Reader, OutOfIndexException, SourceReader
+from .reader import Reader, SourceReader
+
+
+class OutOfIndexException(Exception):
+    pass
 
 
 class ParquetFileDataPiece:
@@ -37,6 +41,9 @@ class ParquetFileDataPiece:
             raise OutOfIndexException
 
     def read_remote(self, batch_index: int) -> Callable:
+        if batch_index >= len(self._row_groups):
+            raise OutOfIndexException
+
         def f():
             return self.read(batch_index)
         return f
