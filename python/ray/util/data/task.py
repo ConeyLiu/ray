@@ -75,21 +75,24 @@ class TaskSet:
         assert len(self._tasks) > 0
         assert all([task_equal(self._tasks[0], t) for t in self._tasks])
         if isinstance(self._tasks[0], ParallelTask):
-            self._is_parallel = True
             task = self._tasks.pop(0)
+            self._is_parallel = True
+            self.max_parallel = task.max_parallel
+            self.resources = task.resources or {}
+
             for t in self._tasks:
                 task = t.execute(task)
 
             def remote_fn(task_input):
+                if callable(task_input):
+                    task_input = task_input()
                 return task(task_input)
 
-            self.max_parallel = self._tasks[0].max_parallel
-            self.resources = self._tasks[0].resources or {}
             self.remote_task = ray.remote(remote_fn).options(**self.resources)
 
     def execute(self, input_it: LocalIterator) -> LocalIterator:
         if self._is_parallel:
-            return LocalIterator(lambda: self._execute_parallel(input_it), SharedMetrics())
+            return LocalIterator(lambda timeout: self._execute_parallel(input_it), SharedMetrics())
         else:
             return self._execute_serial(input_it)
 
@@ -165,9 +168,14 @@ class TaskQueue:
         if cur:
             task_sets.append(TaskSet(cur))
 
+        def create_init_fn(source_reader):
+            def init_fn(timeout):
+                return source_reader
+            return init_fn
+
         execution_task = {}
         for i in range(self.num_shards()):
             source_reader = self.reader.get_shard(i)
-            source_reader = LocalIterator(lambda: iter(source_reader), SharedMetrics())
-            execution_task[i] = (source_reader, ExecutionTask(task_sets.copy()))
+            local_it = LocalIterator(create_init_fn(source_reader), SharedMetrics())
+            execution_task[i] = (local_it, ExecutionTask(task_sets.copy()))
         return execution_task

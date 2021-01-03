@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, List, Iterable, Iterator, Optional, Unio
 
 import pandas as pd
 
-from ray.util.iter import (from_items, _NextValueNotReady, LocalIterator, ParallelIterator,
+from ray.util.iter import (from_iterators, _NextValueNotReady, LocalIterator, ParallelIterator,
                            T, U)
 from .reader import ReaderVar, ParallelIteratorReader
 from .task import SerialTask, ParallelTask, TaskQueue, UnresolvedTask
@@ -73,8 +73,14 @@ class MLDataset:
         tasks = []
         for q in self._task_queues:
             tasks += q.create_execution_task().values()
-        tasks = [lambda:t.execute(s) for s, t in tasks]
-        it = from_items(tasks, self.num_shards, repeat=False)
+
+        def create_execute_fn(task, input_it):
+            def execute_fn():
+                return task.execute(input_it)
+            return execute_fn
+
+        tasks = [create_execute_fn(t, s) for s, t in tasks]
+        it = from_iterators(tasks, repeat=False, name=self._name)
         if action_fn is not None:
             it = action_fn(it)
         return it

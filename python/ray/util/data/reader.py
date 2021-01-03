@@ -59,9 +59,9 @@ class SourceReader:
 
     def __iter__(self) -> Union[Iterable[pd.DataFrame], Iterable[Callable]]:
         if self.max_parallel() > 1:
-            return iter(self.read_parallel())
+            return self.read_parallel()
         else:
-            return iter(self.read())
+            return self.read()
 
     def __str__(self):
         return repr(self)
@@ -135,7 +135,7 @@ class ParallelIteratorSourceReader(SourceReader):
         return "ParallelIterator"
 
     def read(self) -> Iterable[pd.DataFrame]:
-        return iter(self._it.get_shard(self.shard_id))
+        return self._it.get_shard(self.shard_id)
 
     def read_parallel(self) -> Iterable[Callable]:
         raise Exception("Not supported operation")

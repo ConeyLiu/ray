@@ -63,7 +63,6 @@ class ParquetSourceShard(SourceReader):
     def __init__(self,
                  shard_id: int,
                  data_pieces: List[ParquetFileDataPiece],
-                 batch_size: int,
                  max_parallel: int = 1,
                  resources: Dict = None,
                  balance_mode: bool = True):
