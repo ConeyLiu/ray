@@ -5,11 +5,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from .dataset import MLDataset
-from .reader import Reader, SourceReader
-
-
-class OutOfIndexException(Exception):
-    pass
+from .reader import Reader, OutOfIndexException, SourceReader
 
 
 class ParquetFileDataPiece:

@@ -38,6 +38,11 @@ class ParallelTask(Task):
         return execute_fn
 
 
+class NoopParallelTask(ParallelTask):
+    def execute(self, task_input: Callable) -> Callable:
+        return task_input
+
+
 class UnresolvedTask(Task):
     def __init__(self, serial_fn: Callable, parallel_fn: Callable):
         self.serial_fn = serial_fn
@@ -63,7 +68,7 @@ def task_equal(a: T, b: T):
 class TaskSet:
     def __init__(self, tasks: List[T]):
         self._tasks = tasks
-        self._is_parallel = False
+        self.is_parallel = False
 
         self.max_parallel = 1
         self.resources = None
@@ -76,7 +81,7 @@ class TaskSet:
         assert all([task_equal(self._tasks[0], t) for t in self._tasks])
         if isinstance(self._tasks[0], ParallelTask):
             task = self._tasks.pop(0)
-            self._is_parallel = True
+            self.is_parallel = True
             self.max_parallel = task.max_parallel
             self.resources = task.resources or {}
 
@@ -91,7 +96,7 @@ class TaskSet:
             self.remote_task = ray.remote(remote_fn).options(**self.resources)
 
     def execute(self, input_it: LocalIterator) -> LocalIterator:
-        if self._is_parallel:
+        if self.is_parallel:
             return LocalIterator(lambda timeout: self._execute_parallel(input_it), SharedMetrics())
         else:
             return self._execute_serial(input_it)
@@ -167,6 +172,15 @@ class TaskQueue:
 
         if cur:
             task_sets.append(TaskSet(cur))
+
+        if self.reader.max_parallel() > 1:
+            if (len(task_sets) == 0 or not task_sets[0].is_parallel or
+                self.reader.max_parallel() != task_sets[0].max_parallel or
+                    self.reader.resources() != task_sets[0].resources):
+                # prepend NoopTask to parallel reading source data
+                noop_set = TaskSet([NoopParallelTask(
+                    None, self.reader.max_parallel(), self.reader.resources())])
+                task_sets.insert(0, noop_set)
 
         def create_init_fn(source_reader):
             def init_fn(timeout):

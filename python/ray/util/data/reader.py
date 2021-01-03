@@ -5,6 +5,10 @@ import pandas as pd
 from ray.util.iter import ParallelIterator
 
 
+class OutOfIndexException(Exception):
+    pass
+
+
 class SourceReader:
     """A interface for given shard source data reading
 
