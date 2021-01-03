@@ -42,7 +42,7 @@ class MLDataset:
                 should be pandas.DataFrame
             batch_size (int): the batch size
         """
-        reader = ParallelIteratorReader(it)
+        reader = ParallelIteratorReader(it, batch_size=batch_size)
         task_queue = TaskQueue(reader, [])
         return MLDataset(it.name, [task_queue], batch_size)
 
@@ -280,6 +280,13 @@ class MLDataset:
             f"ParallelUnion[{self}, {other}]",
             self._task_queues + other._task_queues,
             batch_size)
+
+    def count(self) -> int:
+        it = self.to_parallel_it().gather_sync()
+        s = 0
+        for df in iter(it):
+            s += df.shape[0]
+        return s
 
     def to_parallel_it(self) -> "ParallelIterator":
         return self._execute()
